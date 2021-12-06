@@ -83,8 +83,12 @@ int64_t svFirstIndexOf(StringView src, StringView str) {
 
 int svCmp(StringView a, StringView b) {
     if (a.size != b.size)
-        return a.size > b.size ? 1 : -1;
+        return a.size - b.size;
     // NOTE: memcmp works exactly the same here but doesn't stop at null
     // characters. In regular use there is no difference between the two
     return memcmp(a.data, b.data, a.size);
+}
+
+char svPeek(StringView sv, size_t n) {
+    return n < sv.size ? sv.data[n] : -1;
 }

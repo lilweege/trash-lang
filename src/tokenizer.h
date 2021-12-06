@@ -21,14 +21,18 @@ typedef enum {
     TOKEN_OPERATOR_LT,
     TOKEN_LPAREN,
     TOKEN_RPAREN,
-    TOKEN_LBRACE,
-    TOKEN_RBRACE,
+    TOKEN_LCURLY,
+    TOKEN_RCURLY,
+    TOKEN_LSQUARE,
+    TOKEN_RSQUARE,
     TOKEN_INTEGER_LITERAL,
+    TOKEN_DOUBLE_LITERAL,
     TOKEN_STRING_LITERAL,
+    TOKEN_CHAR_LITERAL,
     // and more ...
 } TokenKind;
 
-static const char* TokenKindNames[20] = {
+static const char* TokenKindNames[24] = {
     "TOKEN_NONE",
     "TOKEN_IDENTIFIER",
     "TOKEN_OPERATOR_POS",
@@ -45,10 +49,14 @@ static const char* TokenKindNames[20] = {
     "TOKEN_OPERATOR_LT",
     "TOKEN_LPAREN",
     "TOKEN_RPAREN",
-    "TOKEN_LBRACE",
-    "TOKEN_RBRACE",
+    "TOKEN_LCURLY",
+    "TOKEN_RCURLY",
+    "TOKEN_LSQUARE",
+    "TOKEN_RSQUARE",
     "TOKEN_INTEGER_LITERAL",
+    "TOKEN_DOUBLE_LITERAL",
     "TOKEN_STRING_LITERAL",
+    "TOKEN_CHAR_LITERAL",
 };
 
 typedef struct {

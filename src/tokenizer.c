@@ -42,12 +42,22 @@ bool pollToken(Tokenizer* tokenizer) {
         } break;
 
         case '{': {
-            tokenizer->nextToken.kind = TOKEN_LBRACE;
+            tokenizer->nextToken.kind = TOKEN_LCURLY;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
         case '}': {
-            tokenizer->nextToken.kind = TOKEN_RBRACE;
+            tokenizer->nextToken.kind = TOKEN_RCURLY;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+        } break;
+
+        case '[': {
+            tokenizer->nextToken.kind = TOKEN_LSQUARE;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+        } break;
+
+        case ']': {
+            tokenizer->nextToken.kind = TOKEN_RSQUARE;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
@@ -83,7 +93,7 @@ bool pollToken(Tokenizer* tokenizer) {
         } break;
 
         case '=': {
-            if (tokenizer->source.size > 1 && tokenizer->source.data[1] == '=') {
+            if (svPeek(tokenizer->source, 1) == '=') {
                 tokenizer->nextToken.kind = TOKEN_OPERATOR_EQ;
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
             }
@@ -95,7 +105,7 @@ bool pollToken(Tokenizer* tokenizer) {
 
         // TODO: bit shift
         case '>': {
-            if (tokenizer->source.size > 1 && tokenizer->source.data[1] == '=') {
+            if (svPeek(tokenizer->source, 1) == '=') {
                 tokenizer->nextToken.kind = TOKEN_OPERATOR_GE;
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
             }
@@ -106,7 +116,7 @@ bool pollToken(Tokenizer* tokenizer) {
         } break;
 
         case '<': {
-            if (tokenizer->source.size > 1 && tokenizer->source.data[1] == '=') {
+            if (svPeek(tokenizer->source, 1) == '=') {
                 tokenizer->nextToken.kind = TOKEN_OPERATOR_LE;
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
             }
@@ -136,7 +146,7 @@ bool pollToken(Tokenizer* tokenizer) {
                 tokenizerFail(*tokenizer, "Unmatched '");
             }
             else {
-                tokenizer->nextToken.kind = TOKEN_STRING_LITERAL;
+                tokenizer->nextToken.kind = TOKEN_CHAR_LITERAL;
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
                 svLeftChop(&tokenizer->source, 1); // close quote
             }
@@ -170,7 +180,15 @@ bool pollToken(Tokenizer* tokenizer) {
                 // integer literal
                 tokenizer->nextToken.kind = TOKEN_INTEGER_LITERAL;
                 tokenizer->nextToken.text = svLeftChopWhile(&tokenizer->source, isNumeric);
-                // TODO: double literals
+                // double literal
+                // for now, something like ".1" is not allowed
+                // it must have a leading integer part, i.e. "0.1"
+                if (svPeek(tokenizer->source, 0) == '.') {
+                    tokenizer->nextToken.kind = TOKEN_DOUBLE_LITERAL;
+                    svLeftChop(&tokenizer->source, 1); // decimal point
+                    StringView mantissa = svLeftChopWhile(&tokenizer->source, isNumeric);
+                    tokenizer->nextToken.text.size += mantissa.size + 1;
+                }
             }
             else {
                 assert(0 && "Error: Unhandled character");
