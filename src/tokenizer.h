@@ -45,7 +45,6 @@ typedef struct {
 } Tokenizer;
 
 
-int readFile(char* filename, StringView* outView);
 bool pollToken(Tokenizer* tokenizer);
 
 #endif // _TOKENIZER_H
