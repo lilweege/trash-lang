@@ -1,8 +1,20 @@
 #include "tokenizer.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <ctype.h>
+
+bool isIdentifier(char c) { return isalnum(c) || c == '_'; }
+bool isNumeric(char c) { return isdigit(c); }
+
+void tokenizerFail(Tokenizer tokenizer, char* message) {
+    fprintf(stderr, "%s:%zu: ERROR: %s\n",
+            tokenizer.filename,
+            tokenizer.curLineNo,
+            message);
+    exit(1);
+}
 
 // consumed token == true
 bool pollToken(Tokenizer* tokenizer) {
@@ -11,105 +23,154 @@ bool pollToken(Tokenizer* tokenizer) {
     }
     
     // trim leading whitespace
-    // TODO: update tokenizer curLineNo
-    while (tokenizer->source.size > 0 && isspace(*tokenizer->source.data)) {
-        ++tokenizer->source.data;
-        --tokenizer->source.size;
-    }
+    svLeftTrim(&tokenizer->source, &tokenizer->curLineNo);
 
     if (tokenizer->source.size == 0) {
         return false;
     }
 
-    // TODO: refactor repetition
     char curChar = *tokenizer->source.data;
     switch (curChar) {
         case '(': {
-            tokenizer->nextToken.kind = TOKEN_OPEN_PAREN;
-            tokenizer->nextToken.text.data = tokenizer->source.data;
-            tokenizer->nextToken.text.size = 1;
-            tokenizer->source.data += 1;
-            tokenizer->source.size -= 1;
+            tokenizer->nextToken.kind = TOKEN_LPAREN;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
         case ')': {
-            tokenizer->nextToken.kind = TOKEN_CLOSE_PAREN;
-            tokenizer->nextToken.text.data = tokenizer->source.data;
-            tokenizer->nextToken.text.size = 1;
-            tokenizer->source.data += 1;
-            tokenizer->source.size -= 1;
+            tokenizer->nextToken.kind = TOKEN_RPAREN;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+        } break;
+
+        case '{': {
+            tokenizer->nextToken.kind = TOKEN_LBRACE;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+        } break;
+
+        case '}': {
+            tokenizer->nextToken.kind = TOKEN_RBRACE;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
         case '+': {
             tokenizer->nextToken.kind = TOKEN_OPERATOR_POS;
-            tokenizer->nextToken.text.data = tokenizer->source.data;
-            tokenizer->nextToken.text.size = 1;
-            tokenizer->source.data += 1;
-            tokenizer->source.size -= 1;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
         case '-': {
             tokenizer->nextToken.kind = TOKEN_OPERATOR_NEG;
-            tokenizer->nextToken.text.data = tokenizer->source.data;
-            tokenizer->nextToken.text.size = 1;
-            tokenizer->source.data += 1;
-            tokenizer->source.size -= 1;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
         case '*': {
             tokenizer->nextToken.kind = TOKEN_OPERATOR_MUL;
-            tokenizer->nextToken.text.data = tokenizer->source.data;
-            tokenizer->nextToken.text.size = 1;
-            tokenizer->source.data += 1;
-            tokenizer->source.size -= 1;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
         case '/': {
             tokenizer->nextToken.kind = TOKEN_OPERATOR_DIV;
-            tokenizer->nextToken.text.data = tokenizer->source.data;
-            tokenizer->nextToken.text.size = 1;
-            tokenizer->source.data += 1;
-            tokenizer->source.size -= 1;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+        } break;
+        
+        case '%': {
+            tokenizer->nextToken.kind = TOKEN_OPERATOR_MOD;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
-        case '%': assert(0 && "char % not implemented yet"); break;
-        // handle = and == here
-        case '=': assert(0 && "char = not implemented yet"); break;
+
+        case ',': {
+            tokenizer->nextToken.kind = TOKEN_OPERATOR_COMMA;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+        } break;
+
+        case '=': {
+            if (tokenizer->source.size > 1 && tokenizer->source.data[1] == '=') {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_EQ;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
+            }
+            else {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_ASSIGN;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+            }
+        } break;
+
+        // TODO: bit shift
+        case '>': {
+            if (tokenizer->source.size > 1 && tokenizer->source.data[1] == '=') {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_GE;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
+            }
+            else {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_GT;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+            }
+        } break;
+
+        case '<': {
+            if (tokenizer->source.size > 1 && tokenizer->source.data[1] == '=') {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_LE;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
+            }
+            else {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_LT;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+            }
+        } break;
+
+        case '"': {
+            svLeftChop(&tokenizer->source, 1); // open quote
+            int64_t idx = svFirstIndexOfChar(tokenizer->source, '"');
+            if (idx == -1) {
+                tokenizerFail(*tokenizer, "Unmatched \"");
+            }
+            else {
+                tokenizer->nextToken.kind = TOKEN_STRING_LITERAL;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
+                svLeftChop(&tokenizer->source, 1); // close quote
+            }
+        } break;
+
+        case '\'': {
+            svLeftChop(&tokenizer->source, 1); // open quote
+            int64_t idx = svFirstIndexOfChar(tokenizer->source, '\'');
+            if (idx == -1) {
+                tokenizerFail(*tokenizer, "Unmatched '");
+            }
+            else {
+                tokenizer->nextToken.kind = TOKEN_STRING_LITERAL;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
+                svLeftChop(&tokenizer->source, 1); // close quote
+            }
+        } break;
+
         // TODO: bitwise operators
-        case '"': assert(0 && "char \" not implemented yet"); break;
-        case '\'': assert(0 && "char ' not implemented yet"); break;
-        case '{': assert(0 && "char { not implemented yet"); break;
-        case '}': assert(0 && "char } not implemented yet"); break;
-        case ',': assert(0 && "char , not implemented yet"); break;
+        case '\\': assert(0 && "char \\ not implemented yet"); break;
         case '.': assert(0 && "char . not implemented yet"); break;
-        case '>': assert(0 && "char > not implemented yet"); break;
-        case '<': assert(0 && "char < not implemented yet"); break;
-        // TODO: other operators
+        // TODO: other operators and combinations
 
         default: {
-            if (curChar == '_' || isalpha(curChar)) {
+            if (isalpha(curChar) || curChar == '_') {
                 // identifier or keyword
                 tokenizer->nextToken.kind = TOKEN_IDENTIFIER;
-                tokenizer->nextToken.text.data = tokenizer->source.data;
-                while (tokenizer->source.size > 0 &&
-                        (isalpha(*tokenizer->source.data) || *tokenizer->source.data == '_')) {
-                    ++tokenizer->nextToken.text.size;
-                    ++tokenizer->source.data;
-                    --tokenizer->source.size;
-                }
-                --tokenizer->nextToken.text.size;
+                tokenizer->nextToken.text = svLeftChopWhile(&tokenizer->source, isIdentifier);
+                // TODO: keywords
+                // if (svCmp(svFromCStr("if"), tokenizer->nextToken.text) == 0) {
+                //     // ...
+                // }
+                // else if (svCmp(svFromCStr("else"), tokenizer->nextToken.text) == 0) {
+                //     // ...
+                // }
+                // else if (svCmp(svFromCStr("for"), tokenizer->nextToken.text) == 0) {
+                //     // ...
+                // }
+                // else if (svCmp(svFromCStr("func"), tokenizer->nextToken.text) == 0) {
+                //     // ...
+                // }
             }
             else if (isdigit(curChar)) {
-                // TODO: double literals
                 // integer literal
                 tokenizer->nextToken.kind = TOKEN_INTEGER_LITERAL;
-                tokenizer->nextToken.text.data = tokenizer->source.data;
-                while (tokenizer->source.size > 0 && isdigit(*tokenizer->source.data)) {
-                    ++tokenizer->nextToken.text.size;
-                    ++tokenizer->source.data;
-                    --tokenizer->source.size;
-                }
-                --tokenizer->nextToken.text.size;
+                tokenizer->nextToken.text = svLeftChopWhile(&tokenizer->source, isNumeric);
+                // TODO: double literals
             }
             else {
                 assert(0 && "Error: Unhandled character");

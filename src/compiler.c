@@ -21,7 +21,10 @@ void compileFilename(char* filename) {
     }
 
     printf("Text: `%s`\n", fileView.data);
-    Tokenizer tokenizer = { .source = fileView };
+    Tokenizer tokenizer = {
+        .filename = filename,
+        .source = fileView,
+    };
     while (pollToken(&tokenizer)) {
         Token t = tokenizer.nextToken;
         printf("%s:\t\"%.*s\"\n", TokenKindNames[t.kind], (int)t.text.size, t.text.data);

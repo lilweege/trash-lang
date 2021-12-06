@@ -37,12 +37,20 @@ StringView svLeftChop(StringView *sv, size_t n) {
     return chopped;
 }
 
+StringView svLeftChopWhile(StringView *sv, bool (*predicate)(char c)) {
+    size_t x = 0;
+    while (x < sv->size && predicate(sv->data[x])) {
+        ++x;
+    }
+    return svLeftChop(sv, x);
+}
+
 StringView svSubstring(StringView sv, size_t beginIdx, size_t endIdx) {
     return svNew(sv.data + beginIdx, endIdx - beginIdx);
 }
 
 int64_t svFirstIndexOfChar(StringView sv, char c) {
-    for (int64_t x = 0; x < (int64_t)sv.size; ++x) {
+    for (size_t x = 0; x < sv.size; ++x) {
         if (sv.data[x] == c) {
             return x;
         }
