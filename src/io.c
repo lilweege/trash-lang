@@ -14,7 +14,7 @@ int readFile(char* filename, StringView* outView) {
     // TODO: windows version of file manipulation
     
     // open file
-    FILE* fp = fopen(filename, "r");
+    FILE* fp = fopen(filename, "rb");
     if (fp == NULL) {
         return 1;
     }
@@ -24,7 +24,7 @@ int readFile(char* filename, StringView* outView) {
         return 1;
     }
     long size = ftell(fp);
-    if (size== -1L) {
+    if (size == -1L) {
         return 1;
     }
     if (fseek(fp, 0, SEEK_SET) != 0) {
