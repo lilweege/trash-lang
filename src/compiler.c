@@ -1,6 +1,7 @@
 #include "stringView.h"
 #include "io.h"
 #include "tokenizer.h"
+#include "parser.h"
 
 #include <stdio.h>
 #include <errno.h>
@@ -25,11 +26,6 @@ void compileFilename(char* filename) {
         .filename = filename,
         .source = fileView,
     };
-    while (pollToken(&tokenizer)) {
-        Token t = tokenizer.nextToken;
-        printf("%s:\t\"%.*s\"\n", TokenKindNames[t.kind], (int)t.text.size, t.text.data);
-        tokenizer.nextToken.kind = TOKEN_NONE;
-    }
-
+    parseTokens(tokenizer);
     free(fileView.data);
 }

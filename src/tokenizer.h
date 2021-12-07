@@ -71,7 +71,8 @@ typedef struct {
     size_t curLineNo;
 } Tokenizer;
 
-bool pollToken(Tokenizer* tokenizer);
+void printToken(Token token);
 void tokenizerFail(Tokenizer tokenizer, char* message);
+bool pollToken(Tokenizer* tokenizer);
 
 #endif // _TOKENIZER_H

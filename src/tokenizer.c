@@ -8,6 +8,13 @@
 bool isIdentifier(char c) { return isalnum(c) || c == '_'; }
 bool isNumeric(char c) { return isdigit(c); }
 
+void printToken(Token token) {
+    printf("<%s:\"%.*s\">",
+            TokenKindNames[token.kind],
+            (int)token.text.size,
+            token.text.data);
+}
+
 void tokenizerFail(Tokenizer tokenizer, char* message) {
     fprintf(stderr, "%s:%zu: ERROR: %s\n",
             tokenizer.filename,
@@ -19,13 +26,14 @@ void tokenizerFail(Tokenizer tokenizer, char* message) {
 // consumed token == true
 bool pollToken(Tokenizer* tokenizer) {
     if (tokenizer->nextToken.kind != TOKEN_NONE) {
-        return false;
+        return true;
     }
     
     // trim leading whitespace
     svLeftTrim(&tokenizer->source, &tokenizer->curLineNo);
 
     if (tokenizer->source.size == 0) {
+        printf("POLLED NOTHING\n");
         return false;
     }
 
@@ -86,7 +94,6 @@ bool pollToken(Tokenizer* tokenizer) {
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
         } break;
 
-
         case ',': {
             tokenizer->nextToken.kind = TOKEN_OPERATOR_COMMA;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
@@ -127,6 +134,9 @@ bool pollToken(Tokenizer* tokenizer) {
         } break;
 
         case '"': {
+            // NOTE: currently this is a raw string
+            // TODO: single line string
+            // TODO: escape sequences
             svLeftChop(&tokenizer->source, 1); // open quote
             int64_t idx = svFirstIndexOfChar(tokenizer->source, '"');
             if (idx == -1) {
@@ -196,7 +206,9 @@ bool pollToken(Tokenizer* tokenizer) {
         }
     }
 
-
+    printf("POLLED TOKEN ");
+    printToken(tokenizer->nextToken);
+    printf("\n");
     return true;
 }
 
