@@ -19,6 +19,15 @@ AST* newNode(NodeKind kind, Token token) {
 void parseTokens(Tokenizer tokenizer) {
     AST* resultTree = parseExpression(&tokenizer);
     printf("DONE: &resultTree = %p\n", (void*)resultTree);
+    if (!pollToken(&tokenizer)) {
+        return;
+    }
+    if (tokenizer.nextToken.kind != TOKEN_NEWLINE) {
+        tokenizerFail(tokenizer, "Unexpected token at end of expression");
+    }
+    printf("next token = <%s:\""SV_FMT"\">\n",
+            TokenKindNames[tokenizer.nextToken.kind],
+            SV_ARG(tokenizer.nextToken.text));
     printAST(resultTree, 1);
 }
 
@@ -29,8 +38,7 @@ void printAST(AST* root, size_t depth) {
     }
     printf("[%s]", NodeKindNames[root->kind]);
     if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER /* || ...*/) {
-        printf(": ");
-        printToken(root->token);
+        printf(": <%s:"SV_FMT">", TokenKindNames[root->token.kind], SV_ARG(root->token.text));
     }
     printf("\n");
     printAST(root->left, depth + 1);
@@ -43,9 +51,6 @@ AST* parseExpression(Tokenizer* tokenizer) {
     AST* curr = root;
     while (1) {
         if (!pollToken(tokenizer)) { return curr; }
-        // printf("PARSING EXPR: next token = ");
-        // printToken(tokenizer->nextToken);
-        // printf("\n");
         if (tokenizer->nextToken.kind == TOKEN_OPERATOR_POS) {
             AST* result = newNode(NODE_ADD, tokenizer->nextToken);
             tokenizer->nextToken.kind = TOKEN_NONE;
@@ -73,9 +78,6 @@ AST* parseTerm(Tokenizer* tokenizer) {
     AST* curr = root;
     while (1) {
         if (!pollToken(tokenizer)) { return curr; }
-        // printf("PARSING TERM: next token = ");
-        // printToken(tokenizer->nextToken);
-        // printf("\n");
         if (tokenizer->nextToken.kind == TOKEN_OPERATOR_MUL) {
             AST* result = newNode(NODE_MUL, tokenizer->nextToken);
             tokenizer->nextToken.kind = TOKEN_NONE;

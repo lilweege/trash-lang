@@ -10,6 +10,10 @@ typedef struct {
     size_t size;
 } StringView;
 
+#define SVNULL svNew(NULL, 0)
+#define SV_FMT "%.*s"
+#define SV_ARG(sv) ((int)(sv).size), ((sv).data)
+
 StringView svNew(char *data, size_t size);
 StringView svFromCStr(char *cstr);
 StringView svLeftTrim(StringView* sv, size_t* outNumLines);

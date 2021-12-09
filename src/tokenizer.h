@@ -6,6 +6,7 @@
 
 typedef enum {
     TOKEN_NONE,
+    TOKEN_NEWLINE,
     TOKEN_IDENTIFIER,
     TOKEN_OPERATOR_POS,
     TOKEN_OPERATOR_NEG,
@@ -32,8 +33,9 @@ typedef enum {
     // and more ...
 } TokenKind;
 
-static const char* TokenKindNames[24] = {
+static const char* TokenKindNames[25] = {
     "TOKEN_NONE",
+    "TOKEN_NEWLINE",
     "TOKEN_IDENTIFIER",
     "TOKEN_OPERATOR_POS",
     "TOKEN_OPERATOR_NEG",
@@ -71,7 +73,6 @@ typedef struct {
     size_t curLineNo;
 } Tokenizer;
 
-void printToken(Token token);
 void tokenizerFail(Tokenizer tokenizer, char* message);
 bool pollToken(Tokenizer* tokenizer);
 

@@ -8,13 +8,6 @@
 bool isIdentifier(char c) { return isalnum(c) || c == '_'; }
 bool isNumeric(char c) { return isdigit(c); }
 
-void printToken(Token token) {
-    printf("<%s:\"%.*s\">",
-            TokenKindNames[token.kind],
-            (int)token.text.size,
-            token.text.data);
-}
-
 void tokenizerFail(Tokenizer tokenizer, char* message) {
     fprintf(stderr, "%s:%zu: ERROR: %s\n",
             tokenizer.filename,
@@ -28,9 +21,15 @@ bool pollToken(Tokenizer* tokenizer) {
     if (tokenizer->nextToken.kind != TOKEN_NONE) {
         return true;
     }
-    
+
     // trim leading whitespace
-    svLeftTrim(&tokenizer->source, &tokenizer->curLineNo);
+    size_t numLines;
+    svLeftTrim(&tokenizer->source, &numLines);
+    tokenizer->curLineNo += numLines;
+    if (numLines != 0) {
+        tokenizer->nextToken.kind = TOKEN_NEWLINE;
+        tokenizer->nextToken.text = SVNULL;
+    }
 
     if (tokenizer->source.size == 0) {
         printf("POLLED NOTHING\n");
@@ -206,9 +205,9 @@ bool pollToken(Tokenizer* tokenizer) {
         }
     }
 
-    printf("POLLED TOKEN ");
-    printToken(tokenizer->nextToken);
-    printf("\n");
+    printf("POLLED TOKEN <%s:"SV_FMT">\n",
+            TokenKindNames[tokenizer->nextToken.kind],
+            SV_ARG(tokenizer->nextToken.text));
     return true;
 }
 
