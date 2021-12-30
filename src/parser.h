@@ -6,21 +6,43 @@
 typedef enum {
     NODE_IDENTIFIER,
     NODE_NUMBER,
+    NODE_ASSIGN,
+    NODE_EQ,
+    NODE_NE,
+    NODE_GE,
+    NODE_GT,
+    NODE_LE,
+    NODE_LT,
+    NODE_NOT,
+    NODE_AND,
+    NODE_OR,
     NODE_ADD,
     NODE_SUB,
     NODE_MUL,
     NODE_DIV,
+    NODE_MOD,
     NODE_NEG,
     // ...
 } NodeKind;
 
-static const char* NodeKindNames[7] = {
+static const char* NodeKindNames[18] = {
     "NODE_IDENTIFIER",
     "NODE_NUMBER",
+    "NODE_ASSIGN",
+    "NODE_EQ",
+    "NODE_NE",
+    "NODE_GE",
+    "NODE_GT",
+    "NODE_LE",
+    "NODE_LT",
+    "NODE_NOT",
+    "NODE_AND",
+    "NODE_OR",
     "NODE_ADD",
     "NODE_SUB",
     "NODE_MUL",
     "NODE_DIV",
+    "NODE_MOD",
     "NODE_NEG",
 };
 
@@ -39,7 +61,28 @@ AST* newNode(NodeKind kind, Token token);
 
 void parseTokens(Tokenizer tokenizer);
 void printAST(AST* root, size_t depth);
+
+// an incomplete pseudo grammar definition
+// NOTE: the tokens themselves are not included here
+// TODO: functions, conditional statements
+
+// statement       ->  assignment | expression | if | else | while \n
+// assignment      ->  identifier = expression
+// expression      ->  logicalTerm { || logicalTerm }
+// logicalTerm     ->  locicalFactor { && locicalFactor }
+// logicalFactor   ->  comparison { ==|!= comparison }
+// comparison      ->  value { >=|<=|>|< value }
+// value           ->  term { +|- term }
+// term            ->  factor { *|/|% factor }
+// factor          ->  number | identifier | (expression) | -factor | !factor
+
+AST* parseStatement(Tokenizer* tokenizer);
+AST* parseAssignment(Tokenizer* tokenizer);
 AST* parseExpression(Tokenizer* tokenizer);
+AST* parseLogicalTerm(Tokenizer* tokenizer);
+AST* parseLogicalFactor(Tokenizer* tokenizer);
+AST* parseComparison(Tokenizer* tokenizer);
+AST* parseValue(Tokenizer* tokenizer);
 AST* parseTerm(Tokenizer* tokenizer);
 AST* parseFactor(Tokenizer* tokenizer);
 

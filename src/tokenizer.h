@@ -8,6 +8,9 @@ typedef enum {
     TOKEN_NONE,
     TOKEN_NEWLINE,
     TOKEN_IDENTIFIER,
+    TOKEN_IF,
+    TOKEN_ELSE,
+    TOKEN_WHILE,
     TOKEN_OPERATOR_POS,
     TOKEN_OPERATOR_NEG,
     TOKEN_OPERATOR_MUL,
@@ -16,10 +19,14 @@ typedef enum {
     TOKEN_OPERATOR_COMMA,
     TOKEN_OPERATOR_ASSIGN,
     TOKEN_OPERATOR_EQ,
+    TOKEN_OPERATOR_NE,
     TOKEN_OPERATOR_GE,
     TOKEN_OPERATOR_GT,
     TOKEN_OPERATOR_LE,
     TOKEN_OPERATOR_LT,
+    TOKEN_OPERATOR_NOT,
+    TOKEN_OPERATOR_AND,
+    TOKEN_OPERATOR_OR,
     TOKEN_LPAREN,
     TOKEN_RPAREN,
     TOKEN_LCURLY,
@@ -33,10 +40,13 @@ typedef enum {
     // and more ...
 } TokenKind;
 
-static const char* TokenKindNames[25] = {
+static const char* TokenKindNames[32] = {
     "TOKEN_NONE",
     "TOKEN_NEWLINE",
     "TOKEN_IDENTIFIER",
+    "TOKEN_IF",
+    "TOKEN_ELSE",
+    "TOKEN_WHILE",
     "TOKEN_OPERATOR_POS",
     "TOKEN_OPERATOR_NEG",
     "TOKEN_OPERATOR_MUL",
@@ -45,10 +55,14 @@ static const char* TokenKindNames[25] = {
     "TOKEN_OPERATOR_COMMA",
     "TOKEN_OPERATOR_ASSIGN",
     "TOKEN_OPERATOR_EQ",
+    "TOKEN_OPERATOR_NE",
     "TOKEN_OPERATOR_GE",
     "TOKEN_OPERATOR_GT",
     "TOKEN_OPERATOR_LE",
     "TOKEN_OPERATOR_LT",
+    "TOKEN_OPERATOR_NOT",
+    "TOKEN_OPERATOR_AND",
+    "TOKEN_OPERATOR_OR",
     "TOKEN_LPAREN",
     "TOKEN_RPAREN",
     "TOKEN_LCURLY",
@@ -73,7 +87,7 @@ typedef struct {
     size_t curLineNo;
 } Tokenizer;
 
-void tokenizerFail(Tokenizer tokenizer, char* message);
+void tokenizerFail(Tokenizer tokenizer, char* message, ...);
 bool pollToken(Tokenizer* tokenizer);
 
 #endif // _TOKENIZER_H

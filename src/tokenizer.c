@@ -4,15 +4,21 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 bool isIdentifier(char c) { return isalnum(c) || c == '_'; }
 bool isNumeric(char c) { return isdigit(c); }
 
-void tokenizerFail(Tokenizer tokenizer, char* message) {
-    fprintf(stderr, "%s:%zu: ERROR: %s\n",
+
+void tokenizerFail(Tokenizer tokenizer, char* fmt, ...) {
+    fprintf(stderr, "%s:%zu: ERROR: ",
             tokenizer.filename,
-            tokenizer.curLineNo,
-            message);
+            tokenizer.curLineNo+1);
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fprintf(stderr, "\n");
     exit(1);
 }
 
@@ -29,6 +35,7 @@ bool pollToken(Tokenizer* tokenizer) {
     if (numLines != 0) {
         tokenizer->nextToken.kind = TOKEN_NEWLINE;
         tokenizer->nextToken.text = SVNULL;
+        return true;
     }
 
     if (tokenizer->source.size == 0) {
@@ -106,6 +113,39 @@ bool pollToken(Tokenizer* tokenizer) {
             else {
                 tokenizer->nextToken.kind = TOKEN_OPERATOR_ASSIGN;
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+            }
+        } break;
+
+        case '!': {
+            if (svPeek(tokenizer->source, 1) == '=') {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_NE;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
+            }
+            else {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_NOT;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+            }
+        } break;
+
+        
+        // TODO: bitwise operators
+        case '&': {
+            if (svPeek(tokenizer->source, 1) == '&') {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_AND;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
+            }
+            else {
+                assert(0 && "&? not implemented yet");
+            }
+        } break;
+
+        case '|': {
+            if (svPeek(tokenizer->source, 1) == '|') {
+                tokenizer->nextToken.kind = TOKEN_OPERATOR_OR;
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
+            }
+            else {
+                assert(0 && "|? not implemented yet");
             }
         } break;
 
@@ -205,7 +245,7 @@ bool pollToken(Tokenizer* tokenizer) {
         }
     }
 
-    printf("POLLED TOKEN <%s:"SV_FMT">\n",
+    printf("POLLED TOKEN <%s: \""SV_FMT"\">\n",
             TokenKindNames[tokenizer->nextToken.kind],
             SV_ARG(tokenizer->nextToken.text));
     return true;
