@@ -6,9 +6,9 @@ DEPS = $(OBJS:.o=.d)
 BIN = bin
 
 CC = clang
-CC_COMMON = -MMD -std=c11 -pedantic -Wall -Wextra -Werror -Wshadow -Wunused
+CC_COMMON = -MMD -std=c11 -march=native -Wall -Wextra -Wshadow -Wunused -Werror -Wpedantic
 CC_DEBUG = -g -DDEBUG
-CC_RELEASE = -Ofast
+CC_RELEASE = -O2
 LD_COMMON = 
 LD_DEBUG = 
 LD_RELEASE = 
