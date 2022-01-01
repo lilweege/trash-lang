@@ -14,20 +14,16 @@ StringView svFromCStr(char *cstr) {
 }
 
 StringView svLeftTrim(StringView *sv, size_t* outNumLines) {
-    size_t numLines = 0;
     size_t x = 0;
     while (x < sv->size) {
         char c = sv->data[x];
         if (!(c == ' ' || c == '\r' || c == '\n' || c == '\t')) {
             break;
         }
-        if (c == '\n') {
-            ++numLines;
+        if (outNumLines != NULL && c == '\n') {
+            ++*outNumLines;
         }
         ++x;
-    }
-    if (outNumLines != NULL) {
-        *outNumLines = numLines;
     }
     return svLeftChop(sv, x);
 }

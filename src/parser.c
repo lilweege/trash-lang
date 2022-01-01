@@ -18,12 +18,25 @@ AST* newNode(NodeKind kind, Token token) {
     return node;
 }
 
+void unexpectedToken(Tokenizer* tokenizer) {
+    tokenizerFail(*tokenizer,
+            "Unexpected token <%s: \""SV_FMT"\">",
+            TokenKindNames[tokenizer->nextToken.kind],
+            SV_ARG(tokenizer->nextToken.text));
+}
+
 void parseTokens(Tokenizer tokenizer) {
+    pollToken(&tokenizer);
     AST* resultTree;
     do {
+        printf("PARSING ANOTHER STATEMENT\n");
         resultTree = parseStatement(&tokenizer);
+        printf("next token = <%s: \""SV_FMT"\">\n",
+            TokenKindNames[tokenizer.nextToken.kind],
+            SV_ARG(tokenizer.nextToken.text));
         printAST(resultTree, 0);
     } while (resultTree != NULL);
+    // resultTree = parseProgram(&tokenizer);
 }
 
 void printAST(AST* root, size_t depth) {
@@ -42,37 +55,111 @@ void printAST(AST* root, size_t depth) {
 
 // TODO: fix leaks
 
+AST* parseProgram(Tokenizer* tokenizer) {
+    // TODO
+    return parseStatement(tokenizer);
+}
+
+
 AST* parseStatement(Tokenizer* tokenizer) {
-    AST* result = parseAssignment(tokenizer);
+    AST* result = parseBranch(tokenizer);
+    if (result == NULL) {
+        result = parseAssignment(tokenizer);
+    }
     if (result == NULL) {
         result = parseExpression(tokenizer);
+        if (!pollToken(tokenizer)) return NULL;
+        if (tokenizer->nextToken.kind != TOKEN_SEMICOLON) return NULL;
+        tokenizer->nextToken.kind = TOKEN_NONE;
     }
     if (result == NULL) return NULL;
-    if (tokenizer->nextToken.kind != TOKEN_NEWLINE && 
-            tokenizer->nextToken.kind != TOKEN_NONE) {
-        tokenizerFail(*tokenizer,
-                "Unexpected token <%s: \""SV_FMT"\">",
-                TokenKindNames[tokenizer->nextToken.kind],
-                SV_ARG(tokenizer->nextToken.text));
+    return result;
+}
 
+AST* parseBranch(Tokenizer* tokenizer) {
+    if (!pollToken(tokenizer)) return NULL;
+    if (tokenizer->nextToken.kind != TOKEN_IF && 
+            tokenizer->nextToken.kind != TOKEN_ELSE && 
+            tokenizer->nextToken.kind != TOKEN_WHILE) {
+        return NULL;
+    }
+    NodeKind branchKind =
+        tokenizer->nextToken.kind == TOKEN_IF ? NODE_IF :
+        tokenizer->nextToken.kind == TOKEN_ELSE ? NODE_ELSE : NODE_WHILE;
+    AST* branch = newNode(branchKind, tokenizer->nextToken);
+    tokenizer->nextToken.kind = TOKEN_NONE;
+
+    if (!pollToken(tokenizer)) return NULL;
+    if (tokenizer->nextToken.kind != TOKEN_LPAREN) return NULL;
+    tokenizer->nextToken.kind = TOKEN_NONE;
+    
+    branch->left = parseExpression(tokenizer);
+    if (branch->left == NULL) return NULL;
+    
+    if (!pollToken(tokenizer)) return NULL;
+    if (tokenizer->nextToken.kind != TOKEN_RPAREN) return NULL;
+    tokenizer->nextToken.kind = TOKEN_NONE;
+    
+    branch->right = parseBlock(tokenizer);
+    if (branch->right == NULL) return NULL;
+    return branch;
+}
+
+
+AST* parseBlock(Tokenizer* tokenizer) {
+    //    B
+    //  / |
+    // S  0
+    //  / |
+    // S  1
+    //  / |
+    // S  2
+    // ...
+
+    if (!pollToken(tokenizer)) return NULL;
+    AST* block = newNode(NODE_BLOCK, tokenizer->nextToken);
+    block->left = newNode(NODE_STATEMENT, (Token) { TOKEN_NONE, SVNULL });
+    AST* curr = block->left;
+    
+    if (tokenizer->nextToken.kind != TOKEN_LCURLY) {
+        curr->right = parseStatement(tokenizer);
+        return block;
     }
     tokenizer->nextToken.kind = TOKEN_NONE;
-    return result;
+
+    while (1) {
+        if (!pollToken(tokenizer)) return NULL;
+        if (tokenizer->nextToken.kind == TOKEN_RCURLY) {
+            tokenizer->nextToken.kind = TOKEN_NONE;
+            break;
+        }
+        curr->right = newNode(NODE_STATEMENT, (Token) { TOKEN_NONE, SVNULL });
+        curr->left = parseStatement(tokenizer);
+        curr = curr->right;
+    }
+    return block;
 }
 
 AST* parseAssignment(Tokenizer* original) {
     Tokenizer current = *original;
     Tokenizer* tokenizer = &current;
+    
     if (!pollToken(tokenizer)) return NULL;
     if (tokenizer->nextToken.kind != TOKEN_IDENTIFIER) return NULL;
     AST* lval = newNode(NODE_IDENTIFIER, tokenizer->nextToken);
     tokenizer->nextToken.kind = TOKEN_NONE;
+    
     if (!pollToken(tokenizer)) return NULL;
     if (tokenizer->nextToken.kind != TOKEN_OPERATOR_ASSIGN) return NULL;
     AST* result = newNode(NODE_ASSIGN, tokenizer->nextToken);
     tokenizer->nextToken.kind = TOKEN_NONE;
+    
     AST* expr = parseExpression(tokenizer);
     if (expr == NULL) return NULL;
+    
+    if (tokenizer->nextToken.kind != TOKEN_SEMICOLON) return NULL;
+    tokenizer->nextToken.kind = TOKEN_NONE;
+    
     result->left = lval;
     result->right = expr;
     *original = current;
@@ -84,37 +171,37 @@ AST* parseExpression(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) return curr;
-        if (tokenizer->nextToken.kind == TOKEN_OPERATOR_OR) {
-            AST* result = newNode(NODE_OR, tokenizer->nextToken);
-            tokenizer->nextToken.kind = TOKEN_NONE;
-            result->left = curr;
-            result->right = parseLogicalTerm(tokenizer);
-            curr = result;
-        }
-        else {
+        if (!pollToken(tokenizer)) return NULL;
+        if (tokenizer->nextToken.kind != TOKEN_OPERATOR_OR) {
             break;
         }
+        AST* result = newNode(NODE_OR, tokenizer->nextToken);
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        result->left = curr;
+        result->right = parseLogicalTerm(tokenizer);
+        curr = result;
     }
     return curr;
 }
+
+/* start of uninteresting functions */
+// these are all essentially the same as parseExpression
+// see grammar definition in parser.h to see why
 
 AST* parseLogicalTerm(Tokenizer* tokenizer) {
     AST* root = parseLogicalFactor(tokenizer);
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) return curr;
-        if (tokenizer->nextToken.kind == TOKEN_OPERATOR_AND) {
-            AST* result = newNode(NODE_AND, tokenizer->nextToken);
-            tokenizer->nextToken.kind = TOKEN_NONE;
-            result->left = curr;
-            result->right = parseLogicalFactor(tokenizer);
-            curr = result;
-        }
-        else {
+        if (!pollToken(tokenizer)) return NULL;
+        if (tokenizer->nextToken.kind != TOKEN_OPERATOR_AND) {
             break;
         }
+        AST* result = newNode(NODE_AND, tokenizer->nextToken);
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        result->left = curr;
+        result->right = parseLogicalFactor(tokenizer);
+        curr = result;
     }
     return curr;
 }
@@ -124,20 +211,18 @@ AST* parseLogicalFactor(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) return curr;
-        if (tokenizer->nextToken.kind == TOKEN_OPERATOR_EQ ||
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_NE) {
-            NodeKind resultKind =
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_EQ ? NODE_EQ : NODE_NE;
-            AST* result = newNode(resultKind, tokenizer->nextToken);
-            tokenizer->nextToken.kind = TOKEN_NONE;
-            result->left = curr;
-            result->right = parseComparison(tokenizer);
-            curr = result;
-        }
-        else {
+        if (!pollToken(tokenizer)) return NULL;
+        if (tokenizer->nextToken.kind != TOKEN_OPERATOR_EQ &&
+                tokenizer->nextToken.kind != TOKEN_OPERATOR_NE) {
             break;
         }
+        NodeKind resultKind =
+            tokenizer->nextToken.kind == TOKEN_OPERATOR_EQ ? NODE_EQ : NODE_NE;
+        AST* result = newNode(resultKind, tokenizer->nextToken);
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        result->left = curr;
+        result->right = parseComparison(tokenizer);
+        curr = result;
     }
     return curr;
 }
@@ -147,24 +232,22 @@ AST* parseComparison(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) return curr;
-        if (tokenizer->nextToken.kind == TOKEN_OPERATOR_GE ||
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_LE ||
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_GT ||
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_LT) {
-            NodeKind resultKind =
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_GE ? NODE_GE :
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_LE ? NODE_LE :
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_GT ? NODE_GT : NODE_LT;
-            AST* result = newNode(resultKind, tokenizer->nextToken);
-            tokenizer->nextToken.kind = TOKEN_NONE;
-            result->left = curr;
-            result->right = parseValue(tokenizer);
-            curr = result;
-        }
-        else {
+        if (!pollToken(tokenizer)) return NULL;
+        if (tokenizer->nextToken.kind != TOKEN_OPERATOR_GE &&
+                tokenizer->nextToken.kind != TOKEN_OPERATOR_LE &&
+                tokenizer->nextToken.kind != TOKEN_OPERATOR_GT &&
+                tokenizer->nextToken.kind != TOKEN_OPERATOR_LT) {
             break;
         }
+        NodeKind resultKind =
+            tokenizer->nextToken.kind == TOKEN_OPERATOR_GE ? NODE_GE :
+            tokenizer->nextToken.kind == TOKEN_OPERATOR_LE ? NODE_LE :
+            tokenizer->nextToken.kind == TOKEN_OPERATOR_GT ? NODE_GT : NODE_LT;
+        AST* result = newNode(resultKind, tokenizer->nextToken);
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        result->left = curr;
+        result->right = parseValue(tokenizer);
+        curr = result;
     }
     return curr;
 }
@@ -174,20 +257,18 @@ AST* parseValue(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) return curr;
-        if (tokenizer->nextToken.kind == TOKEN_OPERATOR_POS ||
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_NEG) {
-            NodeKind resultKind =
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_POS ? NODE_ADD : NODE_SUB;
-            AST* result = newNode(resultKind, tokenizer->nextToken);
-            tokenizer->nextToken.kind = TOKEN_NONE;
-            result->left = curr;
-            result->right = parseTerm(tokenizer);
-            curr = result;
-        }
-        else {
+        if (!pollToken(tokenizer)) return NULL;
+        if (tokenizer->nextToken.kind != TOKEN_OPERATOR_POS &&
+                tokenizer->nextToken.kind != TOKEN_OPERATOR_NEG) {
             break;
         }
+        NodeKind resultKind =
+            tokenizer->nextToken.kind == TOKEN_OPERATOR_POS ? NODE_ADD : NODE_SUB;
+        AST* result = newNode(resultKind, tokenizer->nextToken);
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        result->left = curr;
+        result->right = parseTerm(tokenizer);
+        curr = result;
     }
     return curr;
 }
@@ -197,25 +278,25 @@ AST* parseTerm(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) return curr;
-        if (tokenizer->nextToken.kind == TOKEN_OPERATOR_MUL ||
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_DIV ||
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_MOD) {
-            NodeKind resultKind =
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_MUL ? NODE_MUL : 
-                tokenizer->nextToken.kind == TOKEN_OPERATOR_DIV ? NODE_DIV : NODE_MOD;
-            AST* result = newNode(resultKind, tokenizer->nextToken);
-            tokenizer->nextToken.kind = TOKEN_NONE;
-            result->left = curr;
-            result->right = parseFactor(tokenizer);
-            curr = result;
-        }
-        else {
+        if (!pollToken(tokenizer)) return NULL;
+        if (tokenizer->nextToken.kind != TOKEN_OPERATOR_MUL &&
+                tokenizer->nextToken.kind != TOKEN_OPERATOR_DIV &&
+                tokenizer->nextToken.kind != TOKEN_OPERATOR_MOD) {
             break;
         }
+        NodeKind resultKind =
+            tokenizer->nextToken.kind == TOKEN_OPERATOR_MUL ? NODE_MUL : 
+            tokenizer->nextToken.kind == TOKEN_OPERATOR_DIV ? NODE_DIV : NODE_MOD;
+        AST* result = newNode(resultKind, tokenizer->nextToken);
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        result->left = curr;
+        result->right = parseFactor(tokenizer);
+        curr = result;
     }
     return curr;
 }
+
+/* end of uninteresting functions */
 
 AST* parseFactor(Tokenizer* tokenizer) {
     if (!pollToken(tokenizer)) return NULL;

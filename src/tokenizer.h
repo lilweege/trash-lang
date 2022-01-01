@@ -6,7 +6,7 @@
 
 typedef enum {
     TOKEN_NONE,
-    TOKEN_NEWLINE,
+    TOKEN_SEMICOLON,
     TOKEN_IDENTIFIER,
     TOKEN_IF,
     TOKEN_ELSE,
@@ -42,7 +42,7 @@ typedef enum {
 
 static const char* TokenKindNames[32] = {
     "TOKEN_NONE",
-    "TOKEN_NEWLINE",
+    "TOKEN_SEMICOLON",
     "TOKEN_IDENTIFIER",
     "TOKEN_IF",
     "TOKEN_ELSE",

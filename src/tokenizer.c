@@ -29,14 +29,15 @@ bool pollToken(Tokenizer* tokenizer) {
     }
 
     // trim leading whitespace
-    size_t numLines;
+    
+    size_t numLines = 0;
     svLeftTrim(&tokenizer->source, &numLines);
     tokenizer->curLineNo += numLines;
-    if (numLines != 0) {
-        tokenizer->nextToken.kind = TOKEN_NEWLINE;
-        tokenizer->nextToken.text = SVNULL;
-        return true;
-    }
+    // if (numLines != 0) {
+    //     tokenizer->nextToken.kind = TOKEN_NEWLINE;
+    //     tokenizer->nextToken.text = SVNULL;
+    //     return true;
+    // }
 
     if (tokenizer->source.size == 0) {
         printf("POLLED NOTHING\n");
@@ -45,6 +46,11 @@ bool pollToken(Tokenizer* tokenizer) {
 
     char curChar = *tokenizer->source.data;
     switch (curChar) {
+        case ';': {
+            tokenizer->nextToken.kind = TOKEN_SEMICOLON;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
+        } break;
+
         case '(': {
             tokenizer->nextToken.kind = TOKEN_LPAREN;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 1);
@@ -212,15 +218,15 @@ bool pollToken(Tokenizer* tokenizer) {
                 tokenizer->nextToken.kind = TOKEN_IDENTIFIER;
                 tokenizer->nextToken.text = svLeftChopWhile(&tokenizer->source, isIdentifier);
                 // TODO: keywords
-                // if (svCmp(svFromCStr("if"), tokenizer->nextToken.text) == 0) {
-                //     // ...
-                // }
-                // else if (svCmp(svFromCStr("else"), tokenizer->nextToken.text) == 0) {
-                //     // ...
-                // }
-                // else if (svCmp(svFromCStr("for"), tokenizer->nextToken.text) == 0) {
-                //     // ...
-                // }
+                if (svCmp(svFromCStr("if"), tokenizer->nextToken.text) == 0) {
+                    tokenizer->nextToken.kind = TOKEN_IF;
+                }
+                else if (svCmp(svFromCStr("else"), tokenizer->nextToken.text) == 0) {
+                    tokenizer->nextToken.kind = TOKEN_ELSE;
+                }
+                else if (svCmp(svFromCStr("while"), tokenizer->nextToken.text) == 0) {
+                    tokenizer->nextToken.kind = TOKEN_WHILE;
+                }
                 // else if (svCmp(svFromCStr("func"), tokenizer->nextToken.text) == 0) {
                 //     // ...
                 // }

@@ -4,6 +4,11 @@
 #include "tokenizer.h"
 
 typedef enum {
+    NODE_IF,
+    NODE_ELSE,
+    NODE_WHILE,
+    NODE_STATEMENT,
+    NODE_BLOCK,
     NODE_IDENTIFIER,
     NODE_NUMBER,
     NODE_ASSIGN,
@@ -25,7 +30,12 @@ typedef enum {
     // ...
 } NodeKind;
 
-static const char* NodeKindNames[18] = {
+static const char* NodeKindNames[23] = {
+    "NODE_IF",
+    "NODE_ELSE",
+    "NODE_WHILE",
+    "NODE_STATEMENT",
+    "NODE_BLOCK",
     "NODE_IDENTIFIER",
     "NODE_NUMBER",
     "NODE_ASSIGN",
@@ -66,17 +76,23 @@ void printAST(AST* root, size_t depth);
 // NOTE: the tokens themselves are not included here
 // TODO: functions, conditional statements
 
-// statement       ->  assignment | expression | if | else | while \n
-// assignment      ->  identifier = expression
+// program         ->  { statement }
+// statement       ->  branch | assignment | expression ;
+// branch          ->  if | else | while  ( expression ) block
+// block           ->  lcurly { statement } rcurly | statement
+// assignment      ->  identifier = expression ;
 // expression      ->  logicalTerm { || logicalTerm }
-// logicalTerm     ->  locicalFactor { && locicalFactor }
+// logicalTerm     ->  logicalFactor { && logicalFactor }
 // logicalFactor   ->  comparison { ==|!= comparison }
 // comparison      ->  value { >=|<=|>|< value }
 // value           ->  term { +|- term }
 // term            ->  factor { *|/|% factor }
-// factor          ->  number | identifier | (expression) | -factor | !factor
+// factor          ->  number | identifier | ( expression ) | - factor | ! factor
 
+AST* parseProgram(Tokenizer* tokenizer);
 AST* parseStatement(Tokenizer* tokenizer);
+AST* parseBranch(Tokenizer* tokenizer);
+AST* parseBlock(Tokenizer* tokenizer);
 AST* parseAssignment(Tokenizer* tokenizer);
 AST* parseExpression(Tokenizer* tokenizer);
 AST* parseLogicalTerm(Tokenizer* tokenizer);
