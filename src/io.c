@@ -1,3 +1,4 @@
+#include "io.h"
 #include "stringView.h"
 
 #include <stdio.h>
@@ -38,8 +39,8 @@ int readFile(char* filename, StringView* outView) {
     }
     
     // read content
-    long numBytes = fread(buff, 1, size, fp);
-    if (numBytes != size) {
+    size_t numBytes = fread(buff, 1, size, fp);
+    if (numBytes != (size_t)size) {
         free(buff);
         return 1;
     }

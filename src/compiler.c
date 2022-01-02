@@ -1,3 +1,4 @@
+#include "compiler.h"
 #include "stringView.h"
 #include "io.h"
 #include "tokenizer.h"

@@ -3,10 +3,10 @@
 :: since I'm not sure how to replicate all my fancy make shenanigans,
 :: this script will always rebuild the entire project (for now at least)
 
-:: TODO: compile with /WX /Wall
-set CFLAGS_COMMON=/W1 /std:c11 /TC
-set CFLAGS_DEBUG=/Zi
-set CFLAGS_RELEASE=/Ox
+:: TODO: compile with /WX
+set CFLAGS_COMMON=/W4 /wd4996 /std:c11 /TC
+set CFLAGS_DEBUG=/Zi /Od /DDEBUG
+set CFLAGS_RELEASE=/O2
 
 if "%1%" == ""         goto debug
 if "%1%" == "debug"    goto debug
