@@ -3,7 +3,8 @@
 :: since I'm not sure how to replicate all my fancy make shenanigans,
 :: this script will always rebuild the entire project (for now at least)
 
-set CFLAGS_COMMON=/W1 /WX /std:c11 /TC
+:: TODO: compile with /WX /Wall
+set CFLAGS_COMMON=/W1 /std:c11 /TC
 set CFLAGS_DEBUG=/Zi
 set CFLAGS_RELEASE=/Ox
 

@@ -5,8 +5,8 @@ OBJS = $(patsubst $(SRC)/%.c,$(OBJ)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 BIN = bin
 
-CC = clang
-CC_COMMON = -MMD -std=c11 -march=native -Wall -Wextra -Wshadow -Wunused -Werror -Wpedantic
+# TODO: compile with -Werror
+CC_COMMON = -MMD -std=c11 -march=native -Wall -Wextra -Wshadow -Wunused -Wpedantic
 CC_DEBUG = -g -DDEBUG
 CC_RELEASE = -O2
 LD_COMMON = 
