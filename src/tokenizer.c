@@ -9,16 +9,27 @@
 bool isIdentifier(char c) { return isalnum(c) || c == '_'; }
 bool isNumeric(char c) { return isdigit(c); }
 
+void _tokenizerError(Tokenizer tokenizer, size_t line, size_t col, char* fmt, va_list args) {
+    fprintf(stderr, "%s:%zu:%zu: ERROR: ",
+        tokenizer.filename,
+        line, col);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+}
 
-void tokenizerFail(Tokenizer tokenizer, char* fmt, ...) {
-    fprintf(stderr, "%s:%zu: ERROR: ",
-            tokenizer.filename,
-            tokenizer.curLineNo+1);
+void tokenizerFailAt(Tokenizer tokenizer, size_t line, size_t col, char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
+    _tokenizerError(tokenizer, line+1, col+1, fmt, args);
     va_end(args);
-    fprintf(stderr, "\n");
+    exit(1);
+}
+
+void tokenizerFail(Tokenizer tokenizer, char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    _tokenizerError(tokenizer, tokenizer.curLineNo+1, tokenizer.curColNo+1, fmt, args);
+    va_end(args);
     exit(1);
 }
 
@@ -29,15 +40,7 @@ bool pollToken(Tokenizer* tokenizer) {
     }
 
     // trim leading whitespace
-    
-    size_t numLines = 0;
-    svLeftTrim(&tokenizer->source, &numLines);
-    tokenizer->curLineNo += numLines;
-    // if (numLines != 0) {
-    //     tokenizer->nextToken.kind = TOKEN_NEWLINE;
-    //     tokenizer->nextToken.text = SVNULL;
-    //     return true;
-    // }
+    svLeftTrim(&tokenizer->source, &tokenizer->curLineNo, &tokenizer->curColNo);
 
     if (tokenizer->source.size == 0) {
         printf("POLLED NOTHING\n");
@@ -251,8 +254,15 @@ bool pollToken(Tokenizer* tokenizer) {
         }
     }
 
-    printf("POLLED TOKEN <%s: \""SV_FMT"\">\n",
+    // NOTE: doesn't work with current raw string literals
+    tokenizer->nextToken.lineNo = tokenizer->curLineNo;
+    tokenizer->nextToken.colNo = tokenizer->curColNo;
+    tokenizer->curColNo += tokenizer->nextToken.text.size;
+
+    printf("POLLED TOKEN <%s:%zu:%zu: \""SV_FMT"\">\n",
             TokenKindNames[tokenizer->nextToken.kind],
+            tokenizer->nextToken.lineNo+1,
+            tokenizer->nextToken.colNo+1,
             SV_ARG(tokenizer->nextToken.text));
     return true;
 }

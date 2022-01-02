@@ -26,6 +26,7 @@ void compileFilename(char* filename) {
         .filename = filename,
         .source = fileView,
     };
-    parseTokens(tokenizer);
+    AST* program = parseProgram(&tokenizer);
+    (void) program;
     free(fileView.data);
 }

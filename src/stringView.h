@@ -16,7 +16,7 @@ typedef struct {
 
 StringView svNew(char *data, size_t size);
 StringView svFromCStr(char *cstr);
-StringView svLeftTrim(StringView* sv, size_t* outNumLines);
+StringView svLeftTrim(StringView* sv, size_t* outLineNo, size_t* outColNo);
 StringView svLeftChop(StringView* sv, size_t n);
 StringView svLeftChopWhile(StringView *sv, bool (*predicate)(char c));
 StringView svSubstring(StringView sv, size_t beginIdx, size_t endIdx);

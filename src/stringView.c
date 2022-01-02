@@ -13,15 +13,25 @@ StringView svFromCStr(char *cstr) {
     return svNew(cstr, strlen(cstr));
 }
 
-StringView svLeftTrim(StringView *sv, size_t* outNumLines) {
+StringView svLeftTrim(StringView *sv, size_t* outLineNo, size_t* outColNo) {
     size_t x = 0;
     while (x < sv->size) {
         char c = sv->data[x];
         if (!(c == ' ' || c == '\r' || c == '\n' || c == '\t')) {
             break;
         }
-        if (outNumLines != NULL && c == '\n') {
-            ++*outNumLines;
+        if (outLineNo != NULL) {
+            if (c == '\n') {
+                ++*outLineNo;
+            }
+        }
+        if (outColNo != NULL) {
+            if (c == '\n') {
+                *outColNo = 0;
+            }
+            else {
+                ++*outColNo;
+            }
         }
         ++x;
     }

@@ -68,8 +68,6 @@ struct AST {
 // otherwise, the node is a binary node
 
 AST* newNode(NodeKind kind, Token token);
-
-void parseTokens(Tokenizer tokenizer);
 void printAST(AST* root, size_t depth);
 
 // an incomplete pseudo grammar definition

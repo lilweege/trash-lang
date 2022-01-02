@@ -78,16 +78,18 @@ static const char* TokenKindNames[32] = {
 typedef struct {
     TokenKind kind;
     StringView text;
+    size_t lineNo, colNo;
 } Token;
 
 typedef struct {
     char* filename;
     StringView source;
     Token nextToken;
-    size_t curLineNo;
+    size_t curLineNo, curColNo;
 } Tokenizer;
 
 void tokenizerFail(Tokenizer tokenizer, char* message, ...);
+void tokenizerFailAt(Tokenizer tokenizer, size_t line, size_t col, char* message, ...);
 bool pollToken(Tokenizer* tokenizer);
 
 #endif // _TOKENIZER_H
