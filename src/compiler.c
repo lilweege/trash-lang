@@ -8,6 +8,16 @@
 #include <string.h>
 #include <stdlib.h>
 
+void compileArguments(int argc, char** argv) {
+    // TODO: add optional flags
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+        exit(1);
+    }
+
+    compileFilename(argv[1]);
+}
+
 void compileFilename(char* filename) {
     StringView fileView;
     int res = readFile(filename, &fileView);

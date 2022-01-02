@@ -4,12 +4,6 @@
 #include <stdlib.h>
 
 int main(int argc, char** argv) {
-    // TODO: add optional flags
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
-        exit(1);
-    }
-
-    compileFilename(argv[1]);
+    compileArguments(argc, argv);
     return 0;
 }
