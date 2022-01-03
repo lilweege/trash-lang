@@ -181,36 +181,48 @@ bool pollToken(Tokenizer* tokenizer) {
             }
         } break;
 
+        case '\'':
         case '"': {
-            // NOTE: currently this is a raw string
-            // TODO: single line string
-            // TODO: escape sequences
+            char delim = tokenizer->source.data[0];
             svLeftChop(&tokenizer->source, 1); // open quote
-            int64_t idx = svFirstIndexOfChar(tokenizer->source, '"');
-            if (idx == -1) {
-                tokenizerFail(*tokenizer, "Unmatched \"");
+            size_t idx;
+            for (idx = 0; idx < tokenizer->source.size; ++idx) {
+                if (tokenizer->source.data[idx] == delim) {
+                    break;
+                }
+                if (tokenizer->source.data[idx] == '\n') {
+                    tokenizerFailAt(*tokenizer,
+                            tokenizer->curLineNo,
+                            tokenizer->curColNo+idx,
+                            "Unexpected end of line in string literal");
+                }
+                if (tokenizer->source.data[idx] == '\\') {
+                    ++idx;
+                    if (idx >= tokenizer->source.size) {
+                        tokenizerFailAt(*tokenizer,
+                                tokenizer->curLineNo,
+                                tokenizer->curColNo+idx,
+                                "Unexpected end of file in string literal");
+                    }
+                    char escapeChar = tokenizer->source.data[idx];
+                    if (escapeChar != delim && escapeChar != '\n' &&
+                            escapeChar != 'n' && escapeChar != 't' && escapeChar != '\\') {
+                        tokenizerFailAt(*tokenizer,
+                                tokenizer->curLineNo,
+                                tokenizer->curColNo+idx,
+                                "Invalid escape sequence '\\%c'", escapeChar);
+                    }
+                }
             }
-            else {
-                tokenizer->nextToken.kind = TOKEN_STRING_LITERAL;
-                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
-                svLeftChop(&tokenizer->source, 1); // close quote
+            if (idx >= tokenizer->source.size) {
+                tokenizerFail(*tokenizer, "Unexpected end of file in string literal");
             }
+            tokenizer->curColNo += 2; // quotes are not included in string literal token
+            tokenizer->nextToken.kind = delim == '"' ? TOKEN_STRING_LITERAL : TOKEN_CHAR_LITERAL;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
+            svLeftChop(&tokenizer->source, 1); // close quote
         } break;
 
-        case '\'': {
-            svLeftChop(&tokenizer->source, 1); // open quote
-            int64_t idx = svFirstIndexOfChar(tokenizer->source, '\'');
-            if (idx == -1) {
-                tokenizerFail(*tokenizer, "Unmatched '");
-            }
-            else {
-                tokenizer->nextToken.kind = TOKEN_CHAR_LITERAL;
-                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
-                svLeftChop(&tokenizer->source, 1); // close quote
-            }
-        } break;
-
-        // TODO: bitwise operators
         case '\\': assert(0 && "char \\ not implemented yet"); break;
         case '.': assert(0 && "char . not implemented yet"); break;
         // TODO: other operators and combinations
@@ -220,7 +232,6 @@ bool pollToken(Tokenizer* tokenizer) {
                 // identifier or keyword
                 tokenizer->nextToken.kind = TOKEN_IDENTIFIER;
                 tokenizer->nextToken.text = svLeftChopWhile(&tokenizer->source, isIdentifier);
-                // TODO: keywords
                 if (svCmp(svFromCStr("if"), tokenizer->nextToken.text) == 0) {
                     tokenizer->nextToken.kind = TOKEN_IF;
                 }
@@ -254,7 +265,7 @@ bool pollToken(Tokenizer* tokenizer) {
         }
     }
 
-    // NOTE: doesn't work with current raw string literals
+    assert(tokenizer->nextToken.kind != TOKEN_NONE);
     tokenizer->nextToken.lineNo = tokenizer->curLineNo;
     tokenizer->nextToken.colNo = tokenizer->curColNo;
     tokenizer->curColNo += tokenizer->nextToken.text.size;
