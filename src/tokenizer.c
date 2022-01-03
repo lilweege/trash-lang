@@ -241,9 +241,11 @@ bool pollToken(Tokenizer* tokenizer) {
                 else if (svCmp(svFromCStr("while"), tokenizer->nextToken.text) == 0) {
                     tokenizer->nextToken.kind = TOKEN_WHILE;
                 }
-                // else if (svCmp(svFromCStr("func"), tokenizer->nextToken.text) == 0) {
-                //     // ...
-                // }
+                else if (svCmp(svFromCStr("u8"), tokenizer->nextToken.text) == 0 ||
+                        svCmp(svFromCStr("i64"), tokenizer->nextToken.text) == 0 ||
+                        svCmp(svFromCStr("f64"), tokenizer->nextToken.text) == 0) {
+                    tokenizer->nextToken.kind = TOKEN_TYPE;
+                }
             }
             else if (isdigit(curChar)) {
                 // integer literal

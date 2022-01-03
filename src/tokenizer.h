@@ -11,6 +11,7 @@ typedef enum {
     TOKEN_IF,
     TOKEN_ELSE,
     TOKEN_WHILE,
+    TOKEN_TYPE,
     TOKEN_OPERATOR_POS,
     TOKEN_OPERATOR_NEG,
     TOKEN_OPERATOR_MUL,
@@ -40,13 +41,14 @@ typedef enum {
     // and more ...
 } TokenKind;
 
-static const char* TokenKindNames[32] = {
+static const char* TokenKindNames[33] = {
     "TOKEN_NONE",
     "TOKEN_SEMICOLON",
     "TOKEN_IDENTIFIER",
     "TOKEN_IF",
     "TOKEN_ELSE",
     "TOKEN_WHILE",
+    "TOKEN_TYPE",
     "TOKEN_OPERATOR_POS",
     "TOKEN_OPERATOR_NEG",
     "TOKEN_OPERATOR_MUL",
