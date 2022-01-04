@@ -262,7 +262,8 @@ bool pollToken(Tokenizer* tokenizer) {
                 }
             }
             else {
-                assert(0 && "Error: Unhandled character");
+                fprintf(stderr, "ERROR: Unhandled character '%c'\n", curChar);
+                exit(1);
             }
         }
     }
