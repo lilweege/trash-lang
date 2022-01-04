@@ -4,7 +4,7 @@
 :: this script will always rebuild the entire project (for now at least)
 
 :: TODO: compile with /WX
-set CFLAGS_COMMON=/W4 /wd4996 /std:c11 /TC
+set CFLAGS_COMMON=/nologo /W4 /wd4996 /std:c11 /TC
 set CFLAGS_DEBUG=/Zi /Od /DDEBUG
 set CFLAGS_RELEASE=/O2
 
