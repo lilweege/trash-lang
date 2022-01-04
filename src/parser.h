@@ -11,6 +11,7 @@ typedef enum {
     NODE_BLOCK,
     NODE_IDENTIFIER,
     NODE_NUMBER,
+    NODE_STRING,
     NODE_ASSIGN,
     NODE_EQ,
     NODE_NE,
@@ -30,7 +31,7 @@ typedef enum {
     // ...
 } NodeKind;
 
-static const char* NodeKindNames[23] = {
+static const char* NodeKindNames[24] = {
     "NODE_IF",
     "NODE_ELSE",
     "NODE_WHILE",
@@ -38,6 +39,7 @@ static const char* NodeKindNames[23] = {
     "NODE_BLOCK",
     "NODE_IDENTIFIER",
     "NODE_NUMBER",
+    "NODE_STRING",
     "NODE_ASSIGN",
     "NODE_EQ",
     "NODE_NE",
@@ -71,27 +73,36 @@ AST* newNode(NodeKind kind, Token token);
 void printAST(AST* root, size_t depth);
 
 // an incomplete pseudo grammar definition
-// NOTE: the tokens themselves are not included here
-// TODO: functions, conditional statements
+// TODO: bit arithmetic, pointers, arrays (strings will be u8 arrays)
 
-// program         ->  { statement }
-// statement       ->  branch | assignment | expression ;
-// branch          ->  if | else | while  ( expression ) block
-// block           ->  lcurly { statement } rcurly | statement
-// assignment      ->  identifier = expression ;
+// program         ->  { subroutine | statement }
+// statement       ->  branch | assignment | call ; | ;
+// branch          ->  conditional ( expression )  block | statement
+// block           ->  lcurly { statement } rcurly
+// assignment      ->  identifier = rvalue ;
+// rvalue          ->  string | array | expression
+// array           ->  type lsquare integer rsquare
+
 // expression      ->  logicalTerm { || logicalTerm }
 // logicalTerm     ->  logicalFactor { && logicalFactor }
 // logicalFactor   ->  comparison { ==|!= comparison }
 // comparison      ->  value { >=|<=|>|< value }
 // value           ->  term { +|- term }
 // term            ->  factor { *|/|% factor }
-// factor          ->  number | identifier | ( expression ) | - factor | ! factor
+// factor          ->  number | identifier | call | ( expression ) | - factor | ! factor
+
+// call            ->  identifier ( [ rvalue { , rvalue } ] )
+// subroutine      ->  type identifier ( [ type identifier { , type identifier } ] ) block
+
+// conditional     ->  "if" | "else" | "while"
+// type            ->  "u8" | "i64" | "f64"
 
 AST* parseProgram(Tokenizer* tokenizer);
 AST* parseStatement(Tokenizer* tokenizer);
 AST* parseBranch(Tokenizer* tokenizer);
 AST* parseBlock(Tokenizer* tokenizer);
 AST* parseAssignment(Tokenizer* tokenizer);
+AST* parseRvalue(Tokenizer* tokenizer);
 AST* parseExpression(Tokenizer* tokenizer);
 AST* parseLogicalTerm(Tokenizer* tokenizer);
 AST* parseLogicalFactor(Tokenizer* tokenizer);

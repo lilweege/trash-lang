@@ -34,7 +34,7 @@ void printAST(AST* root, size_t depth) {
         putchar('\t');
     }
     printf("[%s]", NodeKindNames[root->kind]);
-    if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER /* || ...*/) {
+    if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER || root->kind == NODE_STRING /* || ...*/) {
         printf(": <%s: \""SV_FMT"\">", TokenKindNames[root->token.kind], SV_ARG(root->token.text));
     }
     printf("\n");
@@ -59,15 +59,26 @@ AST* parseProgram(Tokenizer* tokenizer) {
 
 
 AST* parseStatement(Tokenizer* tokenizer) {
+    if (!pollToken(tokenizer)) return NULL;
+    if (tokenizer->nextToken.kind == TOKEN_SEMICOLON) {
+        Token semi = tokenizer->nextToken;
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        return newNode(NODE_STATEMENT, semi);
+    }
     AST* result = parseBranch(tokenizer);
     if (result == NULL) {
         result = parseAssignment(tokenizer);
     }
     if (result == NULL) {
         result = parseExpression(tokenizer);
-        if (!pollToken(tokenizer)) return NULL;
-        if (tokenizer->nextToken.kind != TOKEN_SEMICOLON) {
-            failAtToken(tokenizer, tokenizer->nextToken, "Expected semicolon before token");
+        if (result == NULL) {
+            // TODO: good error message
+            // failAtToken(tokenizer, tokenizer->nextToken, "I don't know what this is, but it's not correct");
+            return NULL;
+        }
+
+        if (!pollToken(tokenizer) || tokenizer->nextToken.kind != TOKEN_SEMICOLON) {
+            failAtToken(tokenizer, result->token, "Expected semicolon after token");
         }
         tokenizer->nextToken.kind = TOKEN_NONE;
     }
@@ -91,20 +102,31 @@ AST* parseBranch(Tokenizer* tokenizer) {
     if (!pollToken(tokenizer)) {
         failAtToken(tokenizer, tokenizer->nextToken, "Unexpected end of file");
     }
-    if (tokenizer->nextToken.kind != TOKEN_LPAREN) return NULL;
+    if (tokenizer->nextToken.kind != TOKEN_LPAREN) {
+        failAtToken(tokenizer, branch->token, "Expected ( after token");
+    }
     tokenizer->nextToken.kind = TOKEN_NONE;
     
     branch->left = parseExpression(tokenizer);
-    if (branch->left == NULL) return NULL;
+    if (branch->left == NULL) {
+        failAtToken(tokenizer, branch->token, "Invalid expression after (");
+    }
     
     if (!pollToken(tokenizer)) {
         failAtToken(tokenizer, tokenizer->nextToken, "Unexpected end of file");
     }
-    if (tokenizer->nextToken.kind != TOKEN_RPAREN) return NULL;
+    if (tokenizer->nextToken.kind != TOKEN_RPAREN) {
+        failAtToken(tokenizer, branch->token, "Expected ) after expression");
+    }
     tokenizer->nextToken.kind = TOKEN_NONE;
     
     branch->right = parseBlock(tokenizer);
-    if (branch->right == NULL) return NULL;
+    if (branch->right == NULL) {
+        branch->right = parseStatement(tokenizer);
+    }
+    if (branch->right == NULL) {
+        failAtToken(tokenizer, branch->token, "Expected conditional body");
+    }
     return branch;
 }
 
@@ -126,10 +148,7 @@ AST* parseBlock(Tokenizer* tokenizer) {
     block->left = newNode(NODE_STATEMENT, tokenizer->nextToken);
     AST* curr = block->left;
     
-    if (tokenizer->nextToken.kind != TOKEN_LCURLY) {
-        curr->right = parseStatement(tokenizer);
-        return block;
-    }
+    if (tokenizer->nextToken.kind != TOKEN_LCURLY) return NULL;
     tokenizer->nextToken.kind = TOKEN_NONE;
 
     while (1) {
@@ -153,28 +172,41 @@ AST* parseAssignment(Tokenizer* original) {
     
     if (!pollToken(tokenizer)) return NULL;
     if (tokenizer->nextToken.kind != TOKEN_IDENTIFIER) return NULL;
-    AST* lval = newNode(NODE_IDENTIFIER, tokenizer->nextToken);
+    Token id = tokenizer->nextToken;
     tokenizer->nextToken.kind = TOKEN_NONE;
-    
+
     if (!pollToken(tokenizer)) {
         failAtToken(tokenizer, tokenizer->nextToken, "Unexpected end of file");
     }
     if (tokenizer->nextToken.kind != TOKEN_OPERATOR_ASSIGN) return NULL;
-    AST* result = newNode(NODE_ASSIGN, tokenizer->nextToken);
+    Token eq = tokenizer->nextToken;
     tokenizer->nextToken.kind = TOKEN_NONE;
-    
-    AST* expr = parseExpression(tokenizer);
-    if (expr == NULL) return NULL;
-    
-    if (tokenizer->nextToken.kind != TOKEN_SEMICOLON) {
-        failAtToken(tokenizer, tokenizer->nextToken, "Expected semicolon before token");
+
+    AST* rval = parseRvalue(tokenizer);
+    if (rval == NULL || !pollToken(tokenizer) || tokenizer->nextToken.kind != TOKEN_SEMICOLON) {
+        // TODO: better error message
+        failAtToken(tokenizer, eq, "Invalid assignment");
     }
     tokenizer->nextToken.kind = TOKEN_NONE;
     
+    AST* lval = newNode(NODE_IDENTIFIER, id);
+    AST* result = newNode(NODE_ASSIGN, eq);
+
     result->left = lval;
-    result->right = expr;
+    result->right = rval;
     *original = current;
     return result;
+}
+
+AST* parseRvalue(Tokenizer* tokenizer) {
+    // TODO: array
+    if (!pollToken(tokenizer)) return NULL;
+    if (tokenizer->nextToken.kind == TOKEN_STRING_LITERAL) {
+        Token str = tokenizer->nextToken;
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        return newNode(NODE_STRING, str);
+    }
+    return parseExpression(tokenizer);
 }
 
 AST* parseExpression(Tokenizer* tokenizer) {
@@ -339,7 +371,7 @@ AST* parseFactor(Tokenizer* tokenizer) {
         tokenizer->nextToken.kind = TOKEN_NONE;
         AST* expr = parseExpression(tokenizer);
         if (expr == NULL) {
-            return NULL;
+            failAtToken(tokenizer, lparen, "Invalid expression");
         }
         if (tokenizer->nextToken.kind != TOKEN_RPAREN) {
             failAtToken(tokenizer, lparen, "Unmatched token");
