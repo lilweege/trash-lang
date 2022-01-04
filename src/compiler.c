@@ -1,5 +1,5 @@
 #include "compiler.h"
-#include "stringView.h"
+#include "stringview.h"
 #include "io.h"
 #include "tokenizer.h"
 #include "parser.h"

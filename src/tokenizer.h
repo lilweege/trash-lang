@@ -1,7 +1,7 @@
 #ifndef _TOKENIZER_H
 #define _TOKENIZER_H
 
-#include "stringView.h"
+#include "stringview.h"
 #include <stdbool.h>
 
 typedef enum {

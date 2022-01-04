@@ -1,4 +1,4 @@
-#include "stringView.h"
+#include "stringview.h"
 
 #include <string.h>
 

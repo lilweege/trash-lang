@@ -1,7 +1,7 @@
 #ifndef _IO_H
 #define _IO_H
 
-#include "stringView.h"
+#include "stringview.h"
 
 #define FILE_MALLOC_CAP (64 * 1024)
 
