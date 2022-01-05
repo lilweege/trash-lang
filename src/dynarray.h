@@ -26,9 +26,10 @@ bool arrIndex##name(Array* arr, type item, size_t* idx)  { return _arrIndex(arr,
 type* arrGet##name(Array* arr, size_t idx)               { return (type*) _arrGet(arr, idx, sizeof(type));       }
 
 
-typedef int64_t (*CmpPtr)(const void*, const void*);
+// TODO: array shrink
+typedef int (*CmpPtr)(const void*, const void*);
 
-void arrFree(Array* arr);
+void arrFree(Array arr);
 Array _arrNew(size_t itemSize);
 bool _arrGrow(Array* arr, size_t itemSize);
 bool _arrPush(Array* arr, void* addr, size_t itemSize);

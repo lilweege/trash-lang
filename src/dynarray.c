@@ -5,8 +5,8 @@
 #include <string.h>
 #include <assert.h>
 
-void arrFree(Array* arr) {
-    free(arr->data);
+void arrFree(Array arr) {
+    free(arr.data);
 }
 
 Array _arrNew(size_t itemSize) {
@@ -64,7 +64,9 @@ bool _arrIndex(Array* arr, void* addr, size_t* idx, CmpPtr cmp, size_t itemSize)
 #endif
     for (size_t i = 0; i < arr->size; ++i) {
         if (cmp(arr->data + itemSize * i, addr) == 0) {
-            *idx = i;
+            if (idx != NULL) {
+                *idx = i;
+            }
             return true;
         }
     }
