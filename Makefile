@@ -1,12 +1,13 @@
+BIN = bin
+TEST = test
 OBJ = obj
 SRC = src
 SRCS = $(wildcard $(SRC)/*.c)
 OBJS = $(patsubst $(SRC)/%.c,$(OBJ)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
-BIN = bin
 
 # TODO: compile with -Werror
-CC_COMMON = -MMD -std=c11 -march=native -Wall -Wextra -Wshadow -Wunused -Wpedantic
+CC_COMMON = -std=c11 -march=native -Wall -Wextra -Wshadow -Wunused -Wpedantic
 CC_DEBUG = -g -DDEBUG
 CC_RELEASE = -O2
 LD_COMMON = 
@@ -34,16 +35,26 @@ debug: $(TARGET)
 release: clean $(TARGET)
 
 $(OBJ)/%.o: $(SRC)/%.c
-	$(CC) $(CCFLAGS) -c $< -o $@
+	$(CC) -MMD $(CCFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS)
 
-.PHONY: clean
+
+.PHONY: clean test
+
+test: $(TEST)/testall.c
+	$(CC) $(CCFLAGS) $< $(LDFLAGS) -o $(BIN)/$@
+ifeq ($(OS), Windows_NT)
+	.\$(BIN)\$@
+else
+	./$(BIN)/$@
+endif
+
 clean:
 ifeq ($(OS), Windows_NT)
-	del $(subst /,\,$(TARGET) $(DEPS) $(OBJS))
+	del $(subst /,\,$(TARGET) $(DEPS) $(OBJS)) $(BIN)\test.exe
 else
-	rm -f $(TARGET) $(DEPS) $(OBJS)
+	rm -f $(TARGET) $(DEPS) $(OBJS) $(BIN)/test
 endif
 
