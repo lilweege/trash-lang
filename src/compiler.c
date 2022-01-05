@@ -18,7 +18,11 @@ void compileArguments(int argc, char** argv) {
 }
 
 void compileFilename(char* filename) {
-    StringView fileView = readFileOrCrash(filename);
+    size_t fileSize;
+    char* fileContent;
+    readFileOrCrash(filename, &fileSize, &fileContent);
+
+    StringView fileView = svNew(fileSize, fileContent);
 
     printf("Text: `%s`\n", fileView.data);
     Tokenizer tokenizer = {
@@ -27,5 +31,5 @@ void compileFilename(char* filename) {
     };
     AST* program = parseProgram(&tokenizer);
     (void) program;
-    free(fileView.data);
+    free(fileContent);
 }

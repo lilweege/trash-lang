@@ -6,15 +6,14 @@
 #include <stdlib.h>
 #include <errno.h>
 
-StringView readFileOrCrash(char* filename) {
-    StringView fileView;
-    int res = readFile(filename, &fileView);
+void readFileOrCrash(char* filename, size_t* outSize, char** outBuff) {
+    int res = readFile(filename, outSize, outBuff);
     if (res != 0) {
         if (res == -2) {
             fprintf(stderr, "ERROR: Malloc failed\n");
         }
         if (res == -1) {
-            fprintf(stderr, "ERROR: File too large (%zu bytes)\n", fileView.size);
+            fprintf(stderr, "ERROR: File too large (%zu bytes)\n", *outSize);
         }
         else if (res == 1) {
             fprintf(stderr, "ERROR: File error: %s\n", strerror(errno));
@@ -30,8 +29,6 @@ StringView readFileOrCrash(char* filename) {
         }
         exit(1);
     }
-
-    return fileView;
 }
 
 // -2 malloc failed
@@ -40,9 +37,10 @@ StringView readFileOrCrash(char* filename) {
 // 1 file error (errno)
 // 2 feof
 // 3 ferror
-int readFile(char* filename, StringView* outView) {
-    assert(outView != NULL);
-    
+int readFile(char* filename, size_t* outSize, char** outBuff) {
+    assert(outSize != NULL);
+    assert(outBuff != NULL);
+
     // open file
     FILE* fp = fopen(filename, "rb");
     if (fp == NULL) {
@@ -61,7 +59,7 @@ int readFile(char* filename, StringView* outView) {
         return 1;
     }
 
-    outView->size = size;
+    *outSize = size;
     if (size + 1 >= FILE_MALLOC_CAP) {
         return -1;
     }
@@ -86,6 +84,6 @@ int readFile(char* filename, StringView* outView) {
     buff[size] = 0;
 
     // caller is responsible for freeing this
-    outView->data = buff;
+    *outBuff = buff;
     return 0;
 }

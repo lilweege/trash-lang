@@ -2,15 +2,15 @@
 
 #include <string.h>
 
-StringView svNew(char* data, size_t size) {
+StringView svNew(size_t size, const char* data) {
     return (StringView) {
-        .data = data,
         .size = size,
+        .data = data,
     };
 }
 
-StringView svFromCStr(char *cstr) {
-    return svNew(cstr, strlen(cstr));
+StringView svFromCStr(const char* cstr) {
+    return svNew(strlen(cstr), cstr);
 }
 
 StringView svLeftTrim(StringView *sv, size_t* outLineNo, size_t* outColNo) {
@@ -38,11 +38,11 @@ StringView svLeftTrim(StringView *sv, size_t* outLineNo, size_t* outColNo) {
     return svLeftChop(sv, x);
 }
 
-StringView svLeftChop(StringView *sv, size_t n) {
+StringView svLeftChop(StringView* sv, size_t n) {
     if (n > sv->size) {
         n = sv->size;
     }
-    StringView chopped = svNew(sv->data, n);
+    StringView chopped = svNew(n, sv->data);
     sv->data += n;
     sv->size -= n;
     return chopped;
@@ -57,19 +57,22 @@ StringView svLeftChopWhile(StringView *sv, bool (*predicate)(char c)) {
 }
 
 StringView svSubstring(StringView sv, size_t beginIdx, size_t endIdx) {
-    return svNew(sv.data + beginIdx, endIdx - beginIdx);
+    return svNew(endIdx - beginIdx, sv.data + beginIdx);
 }
 
-int64_t svFirstIndexOfChar(StringView sv, char c) {
-    for (size_t x = 0; x < sv.size; ++x) {
-        if (sv.data[x] == c) {
-            return x;
+bool svFirstIndexOfChar(StringView sv, char c, size_t* outIdx) {
+    for (size_t i = 0; i < sv.size; ++i) {
+        if (sv.data[i] == c) {
+            if (outIdx != NULL) {
+                *outIdx = i;
+            }
+            return true;
         }
     }
-    return -1;
+    return false;
 }
 
-int64_t svFirstIndexOf(StringView src, StringView str) {
+bool svFirstIndexOf(StringView src, StringView str, size_t* outIdx) {
     if (str.size > src.size) {
         return -1;
     }
@@ -86,10 +89,13 @@ int64_t svFirstIndexOf(StringView src, StringView str) {
     // FIXME: naive implementation
     for (size_t i = 0; i < src.size - str.size; ++i) {
         if (memcmp(src.data + i, str.data, str.size) == 0) {
-            return i;
+            if (outIdx != NULL) {
+                *outIdx = i;
+            }
+            return true;
         }
     }
-    return -1;
+    return false;
 }
 
 int svCmp(StringView a, StringView b) {
