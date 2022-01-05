@@ -103,3 +103,14 @@ int svCmp(StringView a, StringView b) {
 char svPeek(StringView sv, size_t n) {
     return n < sv.size ? sv.data[n] : -1;
 }
+
+#define FNV1_32_INIT ((uint32_t) 0x811c9dc5)
+#define FNV_32_PRIME ((uint32_t) 0x01000193)
+uint32_t svHash(StringView sv) {
+    uint32_t hash = FNV1_32_INIT;
+    for (size_t i = 0; i < sv.size; ++i) {
+	    hash ^= sv.data[i];
+	    hash *= FNV_32_PRIME;
+    }
+    return hash;
+}

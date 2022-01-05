@@ -25,7 +25,7 @@ int64_t svFirstIndexOfChar(StringView sv, char c);
 int64_t svFirstIndexOf(StringView src, StringView str);
 int svCmp(StringView a, StringView b);
 char svPeek(StringView sv, size_t n);
-// ...
+uint32_t svHash(StringView sv);
 
 // TODO: write some tests for sv operations
 
