@@ -72,16 +72,20 @@ struct AST {
 AST* newNode(NodeKind kind, Token token);
 void printAST(AST* root, size_t depth);
 
-// an incomplete pseudo grammar definition
-// TODO: bit arithmetic, pointers, arrays (strings will be u8 arrays)
+
+// an incomplete (and informal) grammar definition...
+// grammar symbols loosely include: { } [ ] |
+// everything else is either a token kind, literal token text, or non-terminal
+// (hopefully when I revisit this it's not completely unintelligible)
+// TODO: bit arithmetic, pointers, arrays (strings will be u8 arrays), square bracket operator
 
 // program         ->  { subroutine | statement }
-// statement       ->  branch | assignment | call ; | ;
+// subroutine      ->  type identifier ( [ type identifier { , type identifier } ] ) block
+// statement       ->  branch | assignment | [ expression ] ;
 // branch          ->  conditional ( expression )  block | statement
 // block           ->  lcurly { statement } rcurly
-// assignment      ->  identifier = rvalue ;
-// rvalue          ->  string | array | expression
-// array           ->  type lsquare integer rsquare
+// definition      ->  type identifier { , identifier } ;
+// assignment      ->  lvalue = expression ;
 
 // expression      ->  logicalTerm { || logicalTerm }
 // logicalTerm     ->  logicalFactor { && logicalFactor }
@@ -89,13 +93,24 @@ void printAST(AST* root, size_t depth);
 // comparison      ->  value { >=|<=|>|< value }
 // value           ->  term { +|- term }
 // term            ->  factor { *|/|% factor }
-// factor          ->  number | identifier | call | ( expression ) | - factor | ! factor
+// factor          ->  integer | float | string | lvalue | call | ( expression ) | - factor | ! factor
 
-// call            ->  identifier ( [ rvalue { , rvalue } ] )
-// subroutine      ->  type identifier ( [ type identifier { , type identifier } ] ) block
+// call            ->  identifier ( [ expression { , expression } ] )
+// lvalue          ->  identifier [ index ]
+// type            ->  primitive [ index ]
+// index           ->  lsquare expression rsquare
 
 // conditional     ->  "if" | "else" | "while"
-// type            ->  "u8" | "i64" | "f64"
+// primitive       ->  "u8" | "i64" | "u64" | "f64" 
+
+
+// other features (tbd)
+// NOTE: I only choose these symbols because they are distinct from other symbols
+// in the language, and therefore easier to lex (still subject to change)
+// dereference     ->  #x
+// address of      ->  @x
+// comment         ->  ?...
+
 
 AST* parseProgram(Tokenizer* tokenizer);
 AST* parseStatement(Tokenizer* tokenizer);
