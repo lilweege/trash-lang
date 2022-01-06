@@ -39,8 +39,29 @@ bool pollToken(Tokenizer* tokenizer) {
         return true;
     }
 
-    // trim leading whitespace
-    svLeftTrim(&tokenizer->source, &tokenizer->curLineNo, &tokenizer->curColNo);
+    size_t lines, cols;
+    do {
+        // whitespace
+        lines = 0, cols = 0;
+        svLeftTrim(&tokenizer->source, &lines, &cols);
+        tokenizer->curLineNo += lines;
+        tokenizer->curColNo += cols;
+
+        // line comment beginning with '?'
+        if (tokenizer->source.size == 0) {
+            break;
+        }
+        char curChar = *tokenizer->source.data;
+        if (curChar == '?') {
+            size_t commentEnd = 0;
+            if (!svFirstIndexOfChar(tokenizer->source, '\n', &commentEnd)) {
+                break;
+            }
+            svLeftChop(&tokenizer->source, commentEnd);
+            tokenizer->curLineNo++;
+            tokenizer->curColNo = 0;
+        }
+    } while (lines != 0 || cols != 0);
 
     if (tokenizer->source.size == 0) {
         printf("POLLED NOTHING\n");
@@ -251,11 +272,11 @@ bool pollToken(Tokenizer* tokenizer) {
                 // integer literal
                 tokenizer->nextToken.kind = TOKEN_INTEGER_LITERAL;
                 tokenizer->nextToken.text = svLeftChopWhile(&tokenizer->source, isNumeric);
-                // double literal
+                // float literal
                 // for now, something like ".1" is not allowed
                 // it must have a leading integer part, i.e. "0.1"
                 if (svPeek(tokenizer->source, 0) == '.') {
-                    tokenizer->nextToken.kind = TOKEN_DOUBLE_LITERAL;
+                    tokenizer->nextToken.kind = TOKEN_FLOAT_LITERAL;
                     svLeftChop(&tokenizer->source, 1); // decimal point
                     StringView mantissa = svLeftChopWhile(&tokenizer->source, isNumeric);
                     tokenizer->nextToken.text.size += mantissa.size + 1;

@@ -361,7 +361,7 @@ AST* parseFactor(Tokenizer* tokenizer) {
         return result;
     }
     else if (tokenizer->nextToken.kind == TOKEN_INTEGER_LITERAL ||
-            tokenizer->nextToken.kind == TOKEN_DOUBLE_LITERAL) {
+            tokenizer->nextToken.kind == TOKEN_FLOAT_LITERAL) {
         AST* result = newNode(NODE_NUMBER, tokenizer->nextToken);
         tokenizer->nextToken.kind = TOKEN_NONE;
         return result;
