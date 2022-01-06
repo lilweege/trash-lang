@@ -1,5 +1,5 @@
-#ifndef _STRINGVIEW_H
-#define _STRINGVIEW_H
+#ifndef STRINGVIEW_H
+#define STRINGVIEW_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -29,4 +29,4 @@ uint32_t svHash(StringView sv);
 
 // TODO: write some tests for sv operations
 
-#endif // _STRINGVIEW_H
+#endif // STRINGVIEW_H
