@@ -1,5 +1,5 @@
-#ifndef _DYNARRAY_H
-#define _DYNARRAY_H
+#ifndef DYNARRAY_H
+#define DYNARRAY_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -37,4 +37,4 @@ bool _arrErase(Array* arr, size_t idx, size_t num, size_t itemSize);
 bool _arrIndex(Array* arr, void* addr, size_t* idx, CmpPtr cmp, size_t itemSize);
 void* _arrGet(Array* arr, size_t idx, size_t itemSize);
 
-#endif // _DYNARRAY_H
+#endif // DYNARRAY_H

@@ -1,5 +1,5 @@
-#ifndef _PARSER_H
-#define _PARSER_H
+#ifndef PARSER_H
+#define PARSER_H
 
 #include "tokenizer.h"
 
@@ -126,4 +126,4 @@ AST* parseValue(Tokenizer* tokenizer);
 AST* parseTerm(Tokenizer* tokenizer);
 AST* parseFactor(Tokenizer* tokenizer);
 
-#endif // _PARSER_H
+#endif // PARSER_H

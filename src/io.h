@@ -1,5 +1,5 @@
-#ifndef _IO_H
-#define _IO_H
+#ifndef IO_H
+#define IO_H
 
 #include <stddef.h>
 
@@ -8,4 +8,4 @@
 void readFileOrCrash(char* filename, size_t* outSize, char** outBuff);
 int readFile(char *filename, size_t* outSize, char** outBuff);
 
-#endif // _IO_H
+#endif // IO_H

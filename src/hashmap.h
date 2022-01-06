@@ -1,5 +1,5 @@
-#ifndef _HASHMAP_H
-#define _HASHMAP_H
+#ifndef HASHMAP_H
+#define HASHMAP_H
 
 #include "dynarray.h"
 #include "analyzer.h"
@@ -40,4 +40,4 @@ Pair* hmGet(HashMap* hm, Key k);
 bool hmPut(HashMap* hm, Pair x);
 bool hmRemove(HashMap* hm, Key x);
 
-#endif // _HASHMAP_H
+#endif // HASHMAP_H

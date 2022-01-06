@@ -1,5 +1,5 @@
-#ifndef _TOKENIZER_H
-#define _TOKENIZER_H
+#ifndef TOKENIZER_H
+#define TOKENIZER_H
 
 #include "stringview.h"
 #include <stdbool.h>
@@ -94,4 +94,4 @@ void tokenizerFail(Tokenizer tokenizer, char* message, ...);
 void tokenizerFailAt(Tokenizer tokenizer, size_t line, size_t col, char* message, ...);
 bool pollToken(Tokenizer* tokenizer);
 
-#endif // _TOKENIZER_H
+#endif // TOKENIZER_H
