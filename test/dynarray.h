@@ -24,6 +24,7 @@ void printFooArr(Array* arr) {
 }
 
 void testDynarray() {
+    puts("==== TEST DYNARRAY ====");
     Array arr = arrNewFoo();
 
     for (int i = 1; i <= 5; ++i) {
@@ -48,4 +49,5 @@ void testDynarray() {
     printf("cap=%zu\n", arr.cap);
 
     arrFree(arr);
+    puts("==== DONE DYNARRAY ====");
 }

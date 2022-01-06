@@ -40,8 +40,9 @@ goto :EOF
 :test
     pushd obj
         cl %CFLAGS% /Fe..\bin\test.exe ..\test\testall.c
+        set doTest=%errorlevel%
     popd
-    .\bin\test.exe
+    if "%doTest%" == "0" .\bin\test.exe
 goto :EOF
 
 :clean
