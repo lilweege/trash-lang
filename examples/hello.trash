@@ -1,2 +1,4 @@
 
-print("hello world");
+u8[13] hw;
+hw = "hello world\n";
+puts(hw);

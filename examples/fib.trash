@@ -1,0 +1,14 @@
+
+i64 a; a = 0;
+i64 b; b = 0;
+i64 c; c = 1;
+i64 i; i = 0;
+
+while (i < 50) {
+    a = b;
+    b = c;
+    c = a + b;
+    puti(a);
+    putc('\n');
+    i = i + 1;
+}
