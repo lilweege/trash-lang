@@ -12,10 +12,9 @@ while (i < SIZE - 2) {
 
     i64 j; j = 1;
     while (j < SIZE - 1) {
-        i64 a, b, c;
-        a = prvRow[j-1];
-        b = prvRow[j];
-        c = prvRow[j+1];
+        i64 a; a = prvRow[j-1];
+        i64 b; b = prvRow[j];
+        i64 c; c = prvRow[j+1];
         if ( a &&  b &&  c) { curRow[j] = 0; }
         else if ( a &&  b && !c) { curRow[j] = 1; }
         else if ( a && !b &&  c) { curRow[j] = 1; }

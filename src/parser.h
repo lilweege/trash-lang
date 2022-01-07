@@ -7,12 +7,18 @@ typedef enum {
     NODE_IF,
     NODE_ELSE,
     NODE_WHILE,
-    NODE_STATEMENT,
     NODE_BLOCK,
+    NODE_STATEMENT,
+    NODE_CALL,
+    NODE_DEFINITION,
+    NODE_ARGUMENT,
     NODE_IDENTIFIER,
+    NODE_TYPE,
     NODE_NUMBER,
     NODE_STRING,
+    NODE_CHAR,
     NODE_ASSIGN,
+    NODE_LVALUE,
     NODE_EQ,
     NODE_NE,
     NODE_GE,
@@ -31,16 +37,22 @@ typedef enum {
     // ...
 } NodeKind;
 
-static const char* NodeKindNames[24] = {
+static const char* NodeKindNames[30] = {
     "NODE_IF",
     "NODE_ELSE",
     "NODE_WHILE",
-    "NODE_STATEMENT",
     "NODE_BLOCK",
+    "NODE_STATEMENT",
+    "NODE_CALL",
+    "NODE_DEFINITION",
+    "NODE_ARGUMENT",
     "NODE_IDENTIFIER",
+    "NODE_TYPE",
     "NODE_NUMBER",
     "NODE_STRING",
+    "NODE_CHAR",
     "NODE_ASSIGN",
+    "NODE_LVALUE",
     "NODE_EQ",
     "NODE_NE",
     "NODE_GE",
@@ -81,10 +93,10 @@ void printAST(AST* root, size_t depth);
 
 // program         ->  { subroutine | statement }
 // subroutine      ->  type identifier ( [ type identifier { , type identifier } ] ) block
-// statement       ->  branch | assignment | [ expression ] ;
+// statement       ->  branch | definition | assignment | [ expression ] ;
 // branch          ->  conditional ( expression )  block | statement
 // block           ->  lcurly { statement } rcurly
-// definition      ->  type identifier { , identifier } ;
+// definition      ->  type identifier ;
 // assignment      ->  lvalue = expression ;
 
 // expression      ->  logicalTerm { || logicalTerm }
@@ -93,12 +105,12 @@ void printAST(AST* root, size_t depth);
 // comparison      ->  value { >=|<=|>|< value }
 // value           ->  term { +|- term }
 // term            ->  factor { *|/|% factor }
-// factor          ->  integer | float | string | lvalue | call | ( expression ) | - factor | ! factor
+// factor          ->  integer | float | string | char | call | lvalue | ( expression ) | - factor | ! factor
 
 // call            ->  identifier ( [ expression { , expression } ] )
-// lvalue          ->  identifier [ index ]
-// type            ->  primitive [ index ]
-// index           ->  lsquare expression rsquare
+// lvalue          ->  identifier [ subscript ]
+// type            ->  primitive [ subscript ]
+// subscript       ->  lsquare expression rsquare
 
 // conditional     ->  "if" | "else" | "while"
 // primitive       ->  "u8" | "i64" | "u64" | "f64" 
@@ -112,12 +124,15 @@ void printAST(AST* root, size_t depth);
 // comment         ->  ?...
 
 
+
+
 AST* parseProgram(Tokenizer* tokenizer);
+AST* parseSubroutine(Tokenizer* tokenizer);
 AST* parseStatement(Tokenizer* tokenizer);
 AST* parseBranch(Tokenizer* tokenizer);
 AST* parseBlock(Tokenizer* tokenizer);
+AST* parseDefinition(Tokenizer* tokenizer);
 AST* parseAssignment(Tokenizer* tokenizer);
-AST* parseRvalue(Tokenizer* tokenizer);
 AST* parseExpression(Tokenizer* tokenizer);
 AST* parseLogicalTerm(Tokenizer* tokenizer);
 AST* parseLogicalFactor(Tokenizer* tokenizer);
@@ -125,5 +140,9 @@ AST* parseComparison(Tokenizer* tokenizer);
 AST* parseValue(Tokenizer* tokenizer);
 AST* parseTerm(Tokenizer* tokenizer);
 AST* parseFactor(Tokenizer* tokenizer);
+AST* parseCall(Tokenizer* tokenizer);
+AST* parseLvalue(Tokenizer* tokenizer);
+AST* parseType(Tokenizer* tokenizer);
+AST* parseSubscript(Tokenizer* tokenizer);
 
 #endif // PARSER_H
