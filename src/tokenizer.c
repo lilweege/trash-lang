@@ -39,13 +39,16 @@ bool pollToken(Tokenizer* tokenizer) {
         return true;
     }
 
-    size_t lines, cols;
+    size_t lineDiff, colDiff;
     do {
         // whitespace
-        lines = 0, cols = 0;
-        svLeftTrim(&tokenizer->source, &lines, &cols);
-        tokenizer->curLineNo += lines;
-        tokenizer->curColNo += cols;
+        size_t linesBefore, colsBefore;
+
+        linesBefore = tokenizer->curLineNo;
+        colsBefore = tokenizer->curColNo;
+        svLeftTrim(&tokenizer->source, &tokenizer->curLineNo, &tokenizer->curColNo);
+        lineDiff = tokenizer->curLineNo - linesBefore;
+        colDiff = tokenizer->curColNo - colsBefore;
 
         // line comment beginning with '?'
         if (tokenizer->source.size == 0) {
@@ -61,7 +64,7 @@ bool pollToken(Tokenizer* tokenizer) {
             tokenizer->curLineNo++;
             tokenizer->curColNo = 0;
         }
-    } while (lines != 0 || cols != 0);
+    } while (lineDiff != 0 || colDiff != 0);
 
     if (tokenizer->source.size == 0) {
         printf("POLLED NOTHING\n");
@@ -264,6 +267,7 @@ bool pollToken(Tokenizer* tokenizer) {
                 }
                 else if (svCmp(svFromCStr("u8"), tokenizer->nextToken.text) == 0 ||
                         svCmp(svFromCStr("i64"), tokenizer->nextToken.text) == 0 ||
+                        svCmp(svFromCStr("u64"), tokenizer->nextToken.text) == 0 ||
                         svCmp(svFromCStr("f64"), tokenizer->nextToken.text) == 0) {
                     tokenizer->nextToken.kind = TOKEN_TYPE;
                 }
