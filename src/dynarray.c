@@ -26,9 +26,14 @@ bool _arrGrow(Array* arr, size_t itemSize) {
 #ifndef DYNARRAY_UNSAFE
     assert(itemSize == arr->itemSize);
 #endif
-    arr->cap <<= 1;
-    arr->data = realloc(arr->data, itemSize * arr->cap);
-    return arr->data != NULL;
+    size_t newCap = arr->cap << 1; // assume this will never overflow
+    void* newData = realloc(arr->data, itemSize * newCap);
+    if (newData == NULL) {
+        return false;
+    }
+    arr->cap = newCap;
+    arr->data = newData;
+    return true;
 }
 
 bool _arrPush(Array* arr, void* addr, size_t itemSize) {
