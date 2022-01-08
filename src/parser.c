@@ -4,6 +4,44 @@
 #include <stdio.h>
 #include <assert.h>
 
+const char* nodeKindName(NodeKind kind) {
+    static_assert(NODE_COUNT == 30, "Exhaustive check of node kinds failed");
+    const char* NodeKindNames[30] = {
+        "NODE_IF",
+        "NODE_ELSE",
+        "NODE_WHILE",
+        "NODE_BLOCK",
+        "NODE_STATEMENT",
+        "NODE_CALL",
+        "NODE_DEFINITION",
+        "NODE_ARGUMENT",
+        "NODE_IDENTIFIER",
+        "NODE_TYPE",
+        "NODE_NUMBER",
+        "NODE_STRING",
+        "NODE_CHAR",
+        "NODE_ASSIGN",
+        "NODE_LVALUE",
+        "NODE_EQ",
+        "NODE_NE",
+        "NODE_GE",
+        "NODE_GT",
+        "NODE_LE",
+        "NODE_LT",
+        "NODE_NOT",
+        "NODE_AND",
+        "NODE_OR",
+        "NODE_ADD",
+        "NODE_SUB",
+        "NODE_MUL",
+        "NODE_DIV",
+        "NODE_MOD",
+        "NODE_NEG",
+    };
+    return NodeKindNames[kind];
+}
+
+
 #define SCRATCH_SIZE 100
 AST scratchBuffer[SCRATCH_SIZE];
 AST* newNode(NodeKind kind, Token token) {
@@ -22,7 +60,7 @@ AST* newNode(NodeKind kind, Token token) {
     tokenizerFailAt(*(tokenizer), (token).lineNo, (token).colNo, \
             msg" <%s:%d: %s:%zu:%zu: \""SV_FMT"\">", \
             __FILE__, __LINE__, \
-            TokenKindNames[(token).kind], \
+            tokenKindName((token).kind), \
             (token).lineNo+1, \
             (token).colNo+1, \
             SV_ARG((token).text)); \
@@ -33,9 +71,9 @@ void printAST(AST* root, size_t depth) {
     for (size_t i = 0; i < depth; ++i) {
         putchar('\t');
     }
-    printf("[%s]", NodeKindNames[root->kind]);
+    printf("[%s]", nodeKindName(root->kind));
     if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER || root->kind == NODE_STRING || root->kind == NODE_CHAR || root->kind == NODE_DEFINITION || root->kind == NODE_TYPE || root->kind == NODE_STATEMENT || root->kind == NODE_LVALUE /* || ...*/) {
-        printf(": <%s: \""SV_FMT"\">", TokenKindNames[root->token.kind], SV_ARG(root->token.text));
+        printf(": <%s: \""SV_FMT"\">", tokenKindName(root->token.kind), SV_ARG(root->token.text));
     }
     printf("\n");
     printAST(root->left, depth + 1);
@@ -50,7 +88,7 @@ AST* parseProgram(Tokenizer* tokenizer) {
     do {
         resultTree = parseStatement(tokenizer);
         printf("next token = <%s: \""SV_FMT"\">\n",
-            TokenKindNames[tokenizer->nextToken.kind],
+            tokenKindName(tokenizer->nextToken.kind),
             SV_ARG(tokenizer->nextToken.text));
         printAST(resultTree, 0);
     } while (resultTree != NULL);

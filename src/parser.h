@@ -35,40 +35,9 @@ typedef enum {
     NODE_MOD,
     NODE_NEG,
     // ...
+    NODE_COUNT
 } NodeKind;
-
-static const char* NodeKindNames[30] = {
-    "NODE_IF",
-    "NODE_ELSE",
-    "NODE_WHILE",
-    "NODE_BLOCK",
-    "NODE_STATEMENT",
-    "NODE_CALL",
-    "NODE_DEFINITION",
-    "NODE_ARGUMENT",
-    "NODE_IDENTIFIER",
-    "NODE_TYPE",
-    "NODE_NUMBER",
-    "NODE_STRING",
-    "NODE_CHAR",
-    "NODE_ASSIGN",
-    "NODE_LVALUE",
-    "NODE_EQ",
-    "NODE_NE",
-    "NODE_GE",
-    "NODE_GT",
-    "NODE_LE",
-    "NODE_LT",
-    "NODE_NOT",
-    "NODE_AND",
-    "NODE_OR",
-    "NODE_ADD",
-    "NODE_SUB",
-    "NODE_MUL",
-    "NODE_DIV",
-    "NODE_MOD",
-    "NODE_NEG",
-};
+const char* nodeKindName(NodeKind kind);
 
 
 typedef struct AST AST;
