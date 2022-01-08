@@ -73,7 +73,7 @@ void printAST(AST* root, size_t depth) {
         putchar('\t');
     }
     printf("[%s]", nodeKindName(root->kind));
-    if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER || root->kind == NODE_STRING || root->kind == NODE_CHAR || root->kind == NODE_DEFINITION || root->kind == NODE_TYPE || (root->kind == NODE_STATEMENT && root->token.kind != TOKEN_NONE) || root->kind == NODE_LVALUE /* || ...*/) {
+    if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER || root->kind == NODE_STRING || root->kind == NODE_CHAR || root->kind == NODE_DEFINITION || root->kind == NODE_TYPE || (root->kind == NODE_STATEMENT && root->token.kind != TOKEN_NONE) || root->kind == NODE_LVALUE || root->kind == NODE_CALL /* || ...*/) {
         printf(": <%s: \""SV_FMT"\">", tokenKindName(root->token.kind), SV_ARG(root->token.text));
     }
     printf("\n");
@@ -475,6 +475,7 @@ AST* parseCall(Tokenizer* original) {
         failAtToken(tokenizer, tokenizer->nextToken, "Unexpected end of file");
     }
     if (tokenizer->nextToken.kind != TOKEN_IDENTIFIER) return NULL;
+    AST* call = newNode(NODE_CALL, tokenizer->nextToken);
     tokenizer->nextToken.kind = TOKEN_NONE;
     
     // similar to block
@@ -482,10 +483,8 @@ AST* parseCall(Tokenizer* original) {
         failAtToken(tokenizer, tokenizer->nextToken, "Unexpected end of file");
     }
     if (tokenizer->nextToken.kind != TOKEN_LPAREN) return NULL;
-    Token lparen = tokenizer->nextToken;
     tokenizer->nextToken.kind = TOKEN_NONE;
 
-    AST* call = newNode(NODE_CALL, lparen);
     call->left = newNode(NODE_ARGUMENT, (Token){0});
     AST* curr = call->left;
 
