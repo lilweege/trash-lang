@@ -11,19 +11,12 @@ typedef StringView Key;
 typedef Symbol Pair;
 #define key id
 
-/**/
 
 typedef struct {
     uint32_t hv;
     bool found;
     size_t idx;
 } Hint;
-
-
-int pairCmp(const void* a, const void* b) {
-    return KeyCmp(((Pair*) a)->key, ((Pair*) b)->key);
-}
-SPECIALIZE_DYNARRAY_NAMED(KV, Pair, pairCmp)
 
 typedef struct {
     Array* buckets;

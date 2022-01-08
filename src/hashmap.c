@@ -3,6 +3,12 @@
 #include <stdlib.h>
 #include <assert.h>
 
+int pairCmp(const void* a, const void* b) {
+    return KeyCmp(((Pair*) a)->key, ((Pair*) b)->key);
+}
+
+SPECIALIZE_DYNARRAY_NAMED(KV, Pair, pairCmp)
+
 // best results with prime numBuckets
 HashMap hmNew(size_t numBuckets) {
     HashMap hm;
