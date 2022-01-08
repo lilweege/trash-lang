@@ -4,6 +4,7 @@
 #include "tokenizer.h"
 
 typedef enum {
+    NODE_PROGRAM,
     NODE_IF,
     NODE_ELSE,
     NODE_WHILE,
@@ -62,7 +63,7 @@ void printAST(AST* root, size_t depth);
 
 // program         ->  { subroutine | statement }
 // subroutine      ->  type identifier ( [ type identifier { , type identifier } ] ) block
-// statement       ->  branch | definition | assignment | [ expression ] ;
+// statement       ->  branch | definition | assignment | expression ;
 // branch          ->  conditional ( expression )  block | statement
 // block           ->  lcurly { statement } rcurly
 // definition      ->  type identifier ;

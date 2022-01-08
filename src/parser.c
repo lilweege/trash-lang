@@ -5,8 +5,9 @@
 #include <assert.h>
 
 const char* nodeKindName(NodeKind kind) {
-    static_assert(NODE_COUNT == 30, "Exhaustive check of node kinds failed");
-    const char* NodeKindNames[30] = {
+    static_assert(NODE_COUNT == 31, "Exhaustive check of node kinds failed");
+    const char* NodeKindNames[31] = {
+        "NODE_PROGRAM",
         "NODE_IF",
         "NODE_ELSE",
         "NODE_WHILE",
@@ -72,26 +73,34 @@ void printAST(AST* root, size_t depth) {
         putchar('\t');
     }
     printf("[%s]", nodeKindName(root->kind));
-    if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER || root->kind == NODE_STRING || root->kind == NODE_CHAR || root->kind == NODE_DEFINITION || root->kind == NODE_TYPE || root->kind == NODE_STATEMENT || root->kind == NODE_LVALUE /* || ...*/) {
+    if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER || root->kind == NODE_STRING || root->kind == NODE_CHAR || root->kind == NODE_DEFINITION || root->kind == NODE_TYPE || (root->kind == NODE_STATEMENT && root->token.kind != TOKEN_NONE) || root->kind == NODE_LVALUE /* || ...*/) {
         printf(": <%s: \""SV_FMT"\">", tokenKindName(root->token.kind), SV_ARG(root->token.text));
     }
     printf("\n");
-    printAST(root->left, depth + 1);
-    printAST(root->right, depth + 1);
+    int newDepth = depth + (root->kind == NODE_STATEMENT || root->kind == NODE_ARGUMENT ? 0 : 1);
+    printAST(root->left, newDepth);
+    printAST(root->right, newDepth);
 }
 
 // TODO: fix leaks
 
 AST* parseProgram(Tokenizer* tokenizer) {
     pollToken(tokenizer);
-    AST* resultTree;
-    do {
-        resultTree = parseStatement(tokenizer);
-        printf("next token = <%s: \""SV_FMT"\">\n",
-            tokenKindName(tokenizer->nextToken.kind),
-            SV_ARG(tokenizer->nextToken.text));
-        printAST(resultTree, 0);
-    } while (resultTree != NULL);
+    AST* resultTree = newNode(NODE_PROGRAM, (Token){0});
+    resultTree->right = newNode(NODE_STATEMENT, (Token){0});
+    AST* curr = resultTree->right;
+
+    while (1) {
+        AST* statement = parseStatement(tokenizer);
+        if (statement == NULL) {
+            break;
+        }
+        assert(statement->kind != NODE_STATEMENT);
+        curr->right = newNode(NODE_STATEMENT, (Token){0});
+        curr->left = statement;
+        curr = curr->right;
+    }
+    printAST(resultTree, 0);
     return resultTree;
 }
 
@@ -104,11 +113,6 @@ AST* parseProgram(Tokenizer* tokenizer) {
 
 AST* parseStatement(Tokenizer* tokenizer) {
     if (!pollToken(tokenizer)) return NULL;
-    if (tokenizer->nextToken.kind == TOKEN_SEMICOLON) {
-        Token semi = tokenizer->nextToken;
-        tokenizer->nextToken.kind = TOKEN_NONE;
-        return newNode(NODE_STATEMENT, semi);
-    }
     AST* result = parseBranch(tokenizer);
     if (result == NULL) {
         result = parseDefinition(tokenizer);
@@ -121,11 +125,12 @@ AST* parseStatement(Tokenizer* tokenizer) {
         if (result == NULL) {
             // TODO: good error message
             // failAtToken(tokenizer, tokenizer->nextToken, "I don't know what this is, but it's not correct");
+            failAtToken(tokenizer, tokenizer->nextToken, "Unexpected token");
             return NULL;
         }
         expectSemicolon(tokenizer, result->token);
     }
-    if (result == NULL) return NULL;
+    assert(result != NULL);
     return result;
 }
 
@@ -463,7 +468,6 @@ AST* parseFactor(Tokenizer* tokenizer) {
 
 // FIXME: almost definitely incorrect
 AST* parseCall(Tokenizer* original) {
-    printf("\t\t\t\t\t\t\t\t\t\tPARSING CALL: START\n");
     Tokenizer current = *original;
     Tokenizer* tokenizer = &current;
 
@@ -472,7 +476,6 @@ AST* parseCall(Tokenizer* original) {
     }
     if (tokenizer->nextToken.kind != TOKEN_IDENTIFIER) return NULL;
     tokenizer->nextToken.kind = TOKEN_NONE;
-    printf("\t\t\t\t\t\t\t\t\t\tPARSING CALL: GOT IDENT\n");
     
     // similar to block
     if (!pollToken(tokenizer)) {
@@ -481,7 +484,6 @@ AST* parseCall(Tokenizer* original) {
     if (tokenizer->nextToken.kind != TOKEN_LPAREN) return NULL;
     Token lparen = tokenizer->nextToken;
     tokenizer->nextToken.kind = TOKEN_NONE;
-    printf("\t\t\t\t\t\t\t\t\t\tPARSING CALL: GOT LPAREN\n");
 
     AST* call = newNode(NODE_CALL, lparen);
     call->left = newNode(NODE_ARGUMENT, (Token){0});
@@ -502,7 +504,6 @@ AST* parseCall(Tokenizer* original) {
     curr->right = newNode(NODE_ARGUMENT, (Token){0});
     curr->left = firstArg;
     curr = curr->right;
-    printf("\t\t\t\t\t\t\t\t\t\tPARSING CALL: FIRST ARG\n");
 
     while (1) {
         if (!pollToken(tokenizer)) {
