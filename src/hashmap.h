@@ -2,6 +2,12 @@
 #define HASHMAP_H
 
 #include "dynarray.h"
+
+typedef struct {
+    Array* buckets;
+    size_t numBuckets;
+} HashMap;
+
 #include "analyzer.h"
 
 // Pair contains a Key type called key
@@ -18,10 +24,6 @@ typedef struct {
     size_t idx;
 } Hint;
 
-typedef struct {
-    Array* buckets;
-    size_t numBuckets;
-} HashMap;
 
 HashMap hmNew(size_t numBuckets);
 void hmFree(HashMap hm);
