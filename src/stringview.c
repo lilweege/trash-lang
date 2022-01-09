@@ -1,6 +1,13 @@
 #include "stringview.h"
 
 #include <string.h>
+#include <ctype.h> // isalnum, isdigit
+#include <inttypes.h> // strtoimax, strtoumax
+#include <stdlib.h> // strtod
+
+
+bool isIdentifier(char c) { return isalnum(c) || c == '_'; }
+bool isNumeric(char c) { return isdigit(c); }
 
 StringView svNew(size_t size, const char* data) {
     return (StringView) {
@@ -120,3 +127,42 @@ uint32_t svHash(StringView sv) {
     }
     return hash;
 }
+
+// TODO: make these not suck
+// unfortunately many implementations rely on null terminated strings
+// there may be an easier way to do this but I am tired
+#define SV_I64_MAX 20
+#define SV_U64_MAX 19
+#define SV_F64_MAX 24
+int64_t svParseI64(StringView sv) {
+    if (sv.size == 0 || sv.size > SV_I64_MAX) {
+        return 0;
+    }
+    char buf[SV_I64_MAX+1];
+    memcpy(buf, sv.data, sv.size);
+    buf[sv.size] = 0;
+    return strtoimax(buf, NULL, 10);
+}
+
+uint64_t svParseU64(StringView sv) {
+    // NOTE: leading negative sign is not handled
+    if (sv.size == 0 || sv.size > SV_U64_MAX) {
+        return 0;
+    }
+    char buf[SV_U64_MAX+1];
+    memcpy(buf, sv.data, sv.size);
+    buf[sv.size] = 0;
+    return strtoumax(buf, NULL, 10);
+}
+
+double svParseF64(StringView sv) {
+    if (sv.size == 0 || sv.size > SV_F64_MAX) {
+        return 0;
+    }
+    char buf[SV_F64_MAX+1];
+    memcpy(buf, sv.data, sv.size);
+    buf[sv.size] = 0;
+    return strtod(buf, NULL);
+}
+
+

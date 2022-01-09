@@ -46,9 +46,6 @@ const char* tokenKindName(TokenKind kind) {
     return TokenKindNames[kind];
 }
 
-bool isIdentifier(char c) { return isalnum(c) || c == '_'; }
-bool isNumeric(char c) { return isdigit(c); }
-
 void _tokenizerError(Tokenizer tokenizer, size_t line, size_t col, char* fmt, va_list args) {
     fprintf(stderr, "%s:%zu:%zu: ERROR: ",
         tokenizer.filename,
