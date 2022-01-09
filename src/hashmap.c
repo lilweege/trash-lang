@@ -9,15 +9,27 @@ int pairCmp(const void* a, const void* b) {
 
 SPECIALIZE_DYNARRAY_NAMED(KV, Pair, pairCmp)
 
-// best results with prime numBuckets
+// TODO: make implementation not suck
 HashMap hmNew(size_t numBuckets) {
     HashMap hm;
     hm.buckets = (Array*) malloc(numBuckets*sizeof(Array));
+    assert(hm.buckets != NULL); // TODO: handle this
     for (size_t i = 0; i < numBuckets; ++i) {
         hm.buckets[i] = arrNewKV();
     }
     hm.numBuckets = numBuckets;
     return hm;
+}
+
+HashMap hmCopy(HashMap hm) {
+    HashMap copy;
+    copy.buckets = (Array*) malloc(hm.numBuckets*sizeof(Array));
+    assert(copy.buckets != NULL); // TODO: handle this
+    for (size_t i = 0; i < hm.numBuckets; ++i) {
+        copy.buckets[i] = arrCopyKV(hm.buckets[i]);
+    }
+    copy.numBuckets = hm.numBuckets;
+    return copy;
 }
 
 void hmFree(HashMap hm) {

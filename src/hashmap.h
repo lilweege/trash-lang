@@ -26,6 +26,7 @@ typedef struct {
 
 
 HashMap hmNew(size_t numBuckets);
+HashMap hmCopy(HashMap hm);
 void hmFree(HashMap hm);
 Hint hmFind(HashMap* hm, Pair x);
 Pair* hmHintGet(HashMap* hm, Hint h);

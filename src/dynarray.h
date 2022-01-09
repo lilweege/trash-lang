@@ -18,7 +18,8 @@ typedef struct {
 
 #define SPECIALIZE_DYNARRAY(type, cmp) SPECIALIZE_DYNARRAY_NAMED(type, type, cmp)
 #define SPECIALIZE_DYNARRAY_NAMED(name, type, cmp) \
-Array arrNew##name()                                     { return _arrNew(sizeof(type));                         } \
+Array arrNew##name()                                     { return _arrNew(sizeof(type), ARRAY_INIT_CAP);         } \
+Array arrCopy##name(Array arr)                           { return _arrCopy(arr, sizeof(type));                   } \
 bool arrGrow##name(Array* arr)                           { return _arrGrow(arr, sizeof(type));                   } \
 bool arrPush##name(Array* arr, type item)                { return _arrPush(arr, &item, sizeof(type));            } \
 bool arrErase##name(Array* arr, size_t idx, size_t num)  { return _arrErase(arr, idx, num, sizeof(type));        } \
@@ -30,7 +31,8 @@ type* arrGet##name(Array* arr, size_t idx)               { return (type*) _arrGe
 typedef int (*CmpPtr)(const void*, const void*);
 
 void arrFree(Array arr);
-Array _arrNew(size_t itemSize);
+Array _arrNew(size_t itemSize, size_t initCap);
+Array _arrCopy(Array arr, size_t itemSize);
 bool _arrGrow(Array* arr, size_t itemSize);
 bool _arrPush(Array* arr, void* addr, size_t itemSize);
 bool _arrErase(Array* arr, size_t idx, size_t num, size_t itemSize);

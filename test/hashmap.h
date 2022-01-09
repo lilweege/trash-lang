@@ -63,6 +63,20 @@ void testHashmap() {
     }
 
     // hmDump(&hm);
+    HashMap cp = hmCopy(hm);
+    assert(cp.buckets != hm.buckets);
+    assert(cp.numBuckets == hm.numBuckets);
+    for (size_t i = 0; i < hm.numBuckets; ++i) {
+        assert(cp.buckets[i].cap == hm.buckets[i].cap);
+        assert(cp.buckets[i].size == hm.buckets[i].size);
+        for (size_t j = 0; j < cp.buckets[i].size; ++j) {
+            Pair* p1 = arrGetKV(&cp.buckets[i], j);
+            Pair* p2 = arrGetKV(&hm.buckets[i], j);
+            assert(p1 != p2);
+            assert(pairCmp(p1, p2) == 0);
+        }
+    }
+    hmFree(cp);
 
     for (size_t i = 0; i < NUM_KEYS; ++i) {
         assert(hmRemove(&hm, keys[i]));
@@ -74,7 +88,6 @@ void testHashmap() {
         if (capMax < hm.buckets[i].cap)
             capMax = hm.buckets[i].cap;
     }
-
     printf("%zu\n", capMax);
 
     assert(hmPut(&hm,  (Pair) { .key = svFromCStr("asd") }));

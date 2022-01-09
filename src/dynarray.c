@@ -9,17 +9,25 @@ void arrFree(Array arr) {
     free(arr.data);
 }
 
-Array _arrNew(size_t itemSize) {
-    void* data = malloc(ARRAY_INIT_CAP * itemSize);
+Array _arrNew(size_t itemSize, size_t initCap) {
+    void* data = malloc(initCap * itemSize);
+    assert(data != NULL); // TODO: handle this
     (void) itemSize;
     return (Array) {
 #ifndef DYNARRAY_UNSAFE
         .itemSize = itemSize,
 #endif
         .size = 0,
-        .cap = ARRAY_INIT_CAP,
+        .cap = initCap,
         .data = data,
     };
+}
+
+Array _arrCopy(Array arr, size_t itemSize) {
+    Array copy = _arrNew(itemSize, arr.cap);
+    memcpy(copy.data, arr.data, itemSize * arr.size);
+    copy.size = arr.size;
+    return copy;
 }
 
 bool _arrGrow(Array* arr, size_t itemSize) {
