@@ -304,7 +304,7 @@ bool pollToken(Tokenizer* tokenizer) {
                 }
                 else if (svCmp(svFromCStr("u8"), tokenizer->nextToken.text) == 0 ||
                         svCmp(svFromCStr("i64"), tokenizer->nextToken.text) == 0 ||
-                        svCmp(svFromCStr("u64"), tokenizer->nextToken.text) == 0 ||
+                        // svCmp(svFromCStr("u64"), tokenizer->nextToken.text) == 0 ||
                         svCmp(svFromCStr("f64"), tokenizer->nextToken.text) == 0) {
                     tokenizer->nextToken.kind = TOKEN_TYPE;
                 }

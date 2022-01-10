@@ -3,6 +3,7 @@
 #include "io.h"
 #include "tokenizer.h"
 #include "parser.h"
+#include "analyzer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +31,8 @@ void compileFilename(char* filename) {
         .source = fileView,
     };
     AST* program = parseProgram(&tokenizer);
-    (void) program;
+    verifyProgram(program);
+    simulateProgram(program);
+
     free(fileContent);
 }

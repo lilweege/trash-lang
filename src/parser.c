@@ -16,9 +16,9 @@ const char* nodeKindName(NodeKind kind) {
         "NODE_CALL",
         "NODE_DEFINITION",
         "NODE_ARGUMENT",
-        "NODE_IDENTIFIER",
         "NODE_TYPE",
-        "NODE_NUMBER",
+        "NODE_INTEGER",
+        "NODE_FLOAT",
         "NODE_STRING",
         "NODE_CHAR",
         "NODE_ASSIGN",
@@ -43,7 +43,7 @@ const char* nodeKindName(NodeKind kind) {
 }
 
 
-#define SCRATCH_SIZE 100
+#define SCRATCH_SIZE 8192
 AST scratchBuffer[SCRATCH_SIZE];
 AST* newNode(NodeKind kind, Token token) {
     // TODO: perhaps store these somewhere local
@@ -73,11 +73,11 @@ void printAST(AST* root, size_t depth) {
         putchar('\t');
     }
     printf("[%s]", nodeKindName(root->kind));
-    if (root->kind == NODE_NUMBER || root->kind == NODE_IDENTIFIER || root->kind == NODE_STRING || root->kind == NODE_CHAR || root->kind == NODE_DEFINITION || root->kind == NODE_TYPE || (root->kind == NODE_STATEMENT && root->token.kind != TOKEN_NONE) || root->kind == NODE_LVALUE || root->kind == NODE_CALL /* || ...*/) {
+    if (root->kind == NODE_INTEGER || root->kind == NODE_FLOAT || root->kind == NODE_STRING || root->kind == NODE_CHAR || root->kind == NODE_DEFINITION || root->kind == NODE_TYPE || (root->kind == NODE_STATEMENT && root->token.kind != TOKEN_NONE) || root->kind == NODE_LVALUE || root->kind == NODE_CALL /* || ...*/) {
         printf(": <%s: \""SV_FMT"\">", tokenKindName(root->token.kind), SV_ARG(root->token.text));
     }
     printf("\n");
-    int newDepth = depth + (root->kind == NODE_STATEMENT || root->kind == NODE_ARGUMENT ? 0 : 1);
+    size_t newDepth = depth + (root->kind == NODE_STATEMENT || root->kind == NODE_ARGUMENT ? 0 : 1);
     printAST(root->left, newDepth);
     printAST(root->right, newDepth);
 }
@@ -418,18 +418,14 @@ AST* parseFactor(Tokenizer* tokenizer) {
     lval = parseLvalue(tokenizer);
     if (lval != NULL) return lval;
     if (tokenizer->nextToken.kind == TOKEN_INTEGER_LITERAL ||
-            tokenizer->nextToken.kind == TOKEN_FLOAT_LITERAL) {
-        AST* result = newNode(NODE_NUMBER, tokenizer->nextToken);
-        tokenizer->nextToken.kind = TOKEN_NONE;
-        return result;
-    }
-    else if (tokenizer->nextToken.kind == TOKEN_STRING_LITERAL) {
-        AST* result = newNode(NODE_STRING, tokenizer->nextToken);
-        tokenizer->nextToken.kind = TOKEN_NONE;
-        return result;
-    }
-    else if (tokenizer->nextToken.kind == TOKEN_CHAR_LITERAL) {
-        AST* result = newNode(NODE_CHAR, tokenizer->nextToken);
+            tokenizer->nextToken.kind == TOKEN_FLOAT_LITERAL ||
+            tokenizer->nextToken.kind == TOKEN_STRING_LITERAL ||
+            tokenizer->nextToken.kind == TOKEN_CHAR_LITERAL) {
+        NodeKind resultKind = 
+            tokenizer->nextToken.kind == TOKEN_INTEGER_LITERAL ? NODE_INTEGER :
+            tokenizer->nextToken.kind == TOKEN_FLOAT_LITERAL ? NODE_FLOAT :
+            tokenizer->nextToken.kind == TOKEN_STRING_LITERAL ? NODE_STRING : NODE_CHAR;
+        AST* result = newNode(resultKind, tokenizer->nextToken);
         tokenizer->nextToken.kind = TOKEN_NONE;
         return result;
     }

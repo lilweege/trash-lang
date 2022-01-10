@@ -13,9 +13,9 @@ typedef enum {
     NODE_CALL,
     NODE_DEFINITION,
     NODE_ARGUMENT,
-    NODE_IDENTIFIER,
     NODE_TYPE,
-    NODE_NUMBER,
+    NODE_INTEGER,
+    NODE_FLOAT,
     NODE_STRING,
     NODE_CHAR,
     NODE_ASSIGN,
@@ -83,7 +83,7 @@ void printAST(AST* root, size_t depth);
 // subscript       ->  lsquare expression rsquare
 
 // conditional     ->  "if" | "else" | "while"
-// primitive       ->  "u8" | "i64" | "u64" | "f64" 
+// primitive       ->  "u8" | "i64" | "f64" 
 
 
 // other features (tbd)

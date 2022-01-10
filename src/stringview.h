@@ -23,7 +23,6 @@ StringView svLeftTrim(StringView* sv, size_t* outLineNo, size_t* outColNo);
 StringView svLeftChop(StringView* sv, size_t n);
 StringView svLeftChopWhile(StringView* sv, bool (*predicate)(char c));
 StringView svSubstring(StringView sv, size_t beginIdx, size_t endIdx);
-// indexOf will return index or -1 if not found
 bool svFirstIndexOfChar(StringView sv, char c, size_t* outIdx);
 bool svFirstIndexOf(StringView src, StringView str, size_t* outIdx);
 int svCmp(StringView a, StringView b);
