@@ -1,4 +1,5 @@
 #include "tokenizer.h"
+#include "compiler.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,29 +47,6 @@ const char* tokenKindName(TokenKind kind) {
     return TokenKindNames[kind];
 }
 
-void _tokenizerError(Tokenizer tokenizer, size_t line, size_t col, char* fmt, va_list args) {
-    fprintf(stderr, "%s:%zu:%zu: ERROR: ",
-        tokenizer.filename,
-        line, col);
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
-}
-
-void tokenizerFailAt(Tokenizer tokenizer, size_t line, size_t col, char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    _tokenizerError(tokenizer, line+1, col+1, fmt, args);
-    va_end(args);
-    exit(1);
-}
-
-void tokenizerFail(Tokenizer tokenizer, char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    _tokenizerError(tokenizer, tokenizer.curLineNo+1, tokenizer.curColNo+1, fmt, args);
-    va_end(args);
-    exit(1);
-}
 
 // consumed token == true
 bool pollToken(Tokenizer* tokenizer) {
@@ -81,11 +59,11 @@ bool pollToken(Tokenizer* tokenizer) {
         // whitespace
         size_t linesBefore, colsBefore;
 
-        linesBefore = tokenizer->curLineNo;
-        colsBefore = tokenizer->curColNo;
-        svLeftTrim(&tokenizer->source, &tokenizer->curLineNo, &tokenizer->curColNo);
-        lineDiff = tokenizer->curLineNo - linesBefore;
-        colDiff = tokenizer->curColNo - colsBefore;
+        linesBefore = tokenizer->curPos.line;
+        colsBefore = tokenizer->curPos.col;
+        svLeftTrim(&tokenizer->source, &tokenizer->curPos.line, &tokenizer->curPos.col);
+        lineDiff = tokenizer->curPos.line - linesBefore;
+        colDiff = tokenizer->curPos.col - colsBefore;
 
         // line comment beginning with '?'
         if (tokenizer->source.size == 0) {
@@ -98,8 +76,8 @@ bool pollToken(Tokenizer* tokenizer) {
                 break;
             }
             svLeftChop(&tokenizer->source, commentEnd);
-            tokenizer->curLineNo++;
-            tokenizer->curColNo = 0;
+            tokenizer->curPos.line++;
+            tokenizer->curPos.col = 1;
         }
     } while (lineDiff != 0 || colDiff != 0);
 
@@ -246,39 +224,39 @@ bool pollToken(Tokenizer* tokenizer) {
         case '"': {
             char delim = tokenizer->source.data[0];
             svLeftChop(&tokenizer->source, 1); // open quote
+            tokenizer->curPos.col += 2; // quotes are not included in string literal token
             size_t idx;
             for (idx = 0; idx < tokenizer->source.size; ++idx) {
                 if (tokenizer->source.data[idx] == delim) {
                     break;
                 }
                 if (tokenizer->source.data[idx] == '\n') {
-                    tokenizerFailAt(*tokenizer,
-                            tokenizer->curLineNo,
-                            tokenizer->curColNo+idx,
-                            "Unexpected end of line in string literal");
+                    compileErrorAt(tokenizer->filename,
+                                   tokenizer->curPos.line,
+                                   tokenizer->curPos.col + idx,
+                                   "Unexpected end of line in string literal");
                 }
                 if (tokenizer->source.data[idx] == '\\') {
                     ++idx;
                     if (idx >= tokenizer->source.size) {
-                        tokenizerFailAt(*tokenizer,
-                                tokenizer->curLineNo,
-                                tokenizer->curColNo+idx,
-                                "Unexpected end of file in string literal");
+                        break;
                     }
                     char escapeChar = tokenizer->source.data[idx];
                     if (escapeChar != delim && escapeChar != '\n' &&
                             escapeChar != 'n' && escapeChar != 't' && escapeChar != '\\') {
-                        tokenizerFailAt(*tokenizer,
-                                tokenizer->curLineNo,
-                                tokenizer->curColNo+idx,
-                                "Invalid escape sequence '\\%c'", escapeChar);
+                        compileErrorAt(tokenizer->filename,
+                                       tokenizer->curPos.line,
+                                       tokenizer->curPos.col + idx,
+                                       "Invalid escape sequence '\\%c'", escapeChar);
                     }
                 }
             }
             if (idx >= tokenizer->source.size) {
-                tokenizerFail(*tokenizer, "Unexpected end of file in string literal");
+                compileErrorAt(tokenizer->filename,
+                               tokenizer->curPos.line,
+                               tokenizer->curPos.col + idx,
+                               "Unexpected end of file in string literal");
             }
-            tokenizer->curColNo += 2; // quotes are not included in string literal token
             tokenizer->nextToken.kind = delim == '"' ? TOKEN_STRING_LITERAL : TOKEN_CHAR_LITERAL;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
             svLeftChop(&tokenizer->source, 1); // close quote
@@ -331,14 +309,14 @@ bool pollToken(Tokenizer* tokenizer) {
     }
 
     assert(tokenizer->nextToken.kind != TOKEN_NONE);
-    tokenizer->nextToken.lineNo = tokenizer->curLineNo;
-    tokenizer->nextToken.colNo = tokenizer->curColNo;
-    tokenizer->curColNo += tokenizer->nextToken.text.size;
+    tokenizer->nextToken.pos.line = tokenizer->curPos.line;
+    tokenizer->nextToken.pos.col = tokenizer->curPos.col;
+    tokenizer->curPos.col += tokenizer->nextToken.text.size;
 
     printf("POLLED TOKEN <%s:%zu:%zu: \""SV_FMT"\">\n",
             tokenKindName(tokenizer->nextToken.kind),
-            tokenizer->nextToken.lineNo+1,
-            tokenizer->nextToken.colNo+1,
+            tokenizer->nextToken.pos.line+1,
+            tokenizer->nextToken.pos.col+1,
             SV_ARG(tokenizer->nextToken.text));
     return true;
 }

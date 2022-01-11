@@ -2,6 +2,7 @@
 #define TOKENIZER_H
 
 #include "stringview.h"
+#include "compiler.h"
 #include <stdbool.h>
 
 typedef enum {
@@ -47,18 +48,16 @@ const char* tokenKindName(TokenKind kind);
 typedef struct {
     TokenKind kind;
     StringView text;
-    size_t lineNo, colNo;
+    FileLocation pos;
 } Token;
 
 typedef struct {
     char* filename;
     StringView source;
     Token nextToken;
-    size_t curLineNo, curColNo;
+    FileLocation curPos;
 } Tokenizer;
 
-void tokenizerFail(Tokenizer tokenizer, char* message, ...);
-void tokenizerFailAt(Tokenizer tokenizer, size_t line, size_t col, char* message, ...);
 bool pollToken(Tokenizer* tokenizer);
 
 #endif // TOKENIZER_H
