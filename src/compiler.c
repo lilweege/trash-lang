@@ -57,10 +57,6 @@ void compileFilename(char* filename) {
     Tokenizer tokenizer = {
         .filename = filename,
         .source = fileView,
-        .curPos = (FileLocation) {
-            .line = 1,
-            .col = 1,
-        },
     };
     AST* program = parseProgram(&tokenizer);
     verifyProgram(program);
