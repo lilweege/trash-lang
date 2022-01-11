@@ -143,27 +143,30 @@ AST* parseBranch(Tokenizer* tokenizer) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
-    if (tokenizer->nextToken.kind != TOKEN_LPAREN) {
-        compileError((FileInfo) { tokenizer->filename, branch->token.pos },
-                     "Expected ( after token");
+    bool hasCondition = branchKind == NODE_IF || branchKind == NODE_WHILE;
+    if (hasCondition) {
+        if (tokenizer->nextToken.kind != TOKEN_LPAREN) {
+            compileError((FileInfo) { tokenizer->filename, branch->token.pos },
+                         "Expected ( after token");
+        }
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        
+        branch->left = parseExpression(tokenizer);
+        if (branch->left == NULL) {
+            compileError((FileInfo) { tokenizer->filename, branch->token.pos },
+                         "Invalid expression after (");
+        }
+        
+        if (!pollToken(tokenizer)) {
+            compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
+                         "Unexpected end of file");
+        }
+        if (tokenizer->nextToken.kind != TOKEN_RPAREN) {
+            compileError((FileInfo) { tokenizer->filename, branch->token.pos },
+                         "Expected ) after expression");
+        }
+        tokenizer->nextToken.kind = TOKEN_NONE;
     }
-    tokenizer->nextToken.kind = TOKEN_NONE;
-    
-    branch->left = parseExpression(tokenizer);
-    if (branch->left == NULL) {
-        compileError((FileInfo) { tokenizer->filename, branch->token.pos },
-                     "Invalid expression after (");
-    }
-    
-    if (!pollToken(tokenizer)) {
-        compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
-                     "Unexpected end of file");
-    }
-    if (tokenizer->nextToken.kind != TOKEN_RPAREN) {
-        compileError((FileInfo) { tokenizer->filename, branch->token.pos },
-                     "Expected ) after expression");
-    }
-    tokenizer->nextToken.kind = TOKEN_NONE;
     
     branch->right = parseBlock(tokenizer);
     if (branch->right == NULL) {
