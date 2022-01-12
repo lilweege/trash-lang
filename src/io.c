@@ -9,23 +9,13 @@
 void readFileOrCrash(char* filename, size_t* outSize, char** outBuff) {
     int res = readFile(filename, outSize, outBuff);
     if (res != 0) {
-        if (res == -2) {
-            fprintf(stderr, "ERROR: Malloc failed\n");
-        }
-        if (res == -1) {
-            fprintf(stderr, "ERROR: File too large (%zu bytes)\n", *outSize);
-        }
-        else if (res == 1) {
-            fprintf(stderr, "ERROR: File error: %s\n", strerror(errno));
-        }
-        else if (res == 2) {
-            fprintf(stderr, "ERROR: File error: Unexpected end of file\n");
-        }
-        else if (res == 3) {
-            fprintf(stderr, "ERROR: File error: Could not read file\n");
-        }
-        else {
-            fprintf(stderr, "ERROR: Uknown error: %s\n", strerror(errno));
+        switch (res) {
+            break; case -2: fprintf(stderr, "ERROR: Malloc failed\n");
+            break; case -1: fprintf(stderr, "ERROR: File '%s' was too large (%zu bytes)\n", filename, *outSize);
+            break; case  1: fprintf(stderr, "ERROR: Couldn't read file '%s': %s\n", filename, strerror(errno));
+            break; case  2: fprintf(stderr, "ERROR: Unexpected end of file '%s'\n", filename);
+            break; case  3: fprintf(stderr, "ERROR: Couldn't read file '%s'\n", filename);
+            break; default: fprintf(stderr, "ERROR: Unkown error reading file '%s': %s\n", filename, strerror(errno));
         }
         exit(1);
     }
