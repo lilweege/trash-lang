@@ -128,6 +128,34 @@ uint32_t svHash(StringView sv) {
     return hash;
 }
 
+bool svToCStr(StringView sv, char* outBuf, size_t* outEnd) {
+    size_t escaped = 0;
+    size_t sz = sv.size;
+    size_t i;
+    for (i = 0; i < sz; ++i) {
+        char ch = sv.data[i];
+        if (ch == '\\') {
+            ++escaped;
+            if (++i >= sz) {
+                break;
+            }
+            char esc = sv.data[i];
+            switch (esc) {
+                case '"': ch = '"'; break;
+                case 'n': ch = '\n'; break;
+                case 't': ch = '\t'; break;
+                default: return false;
+            }
+        }
+        outBuf[i-escaped] = ch;
+    }
+    outBuf[i-escaped] = 0;
+    if (outEnd != NULL) {
+        *outEnd = i-escaped;
+    }
+    return true;
+}
+
 // TODO: make these not suck
 // unfortunately many implementations rely on null terminated strings
 // there may be an easier way to do this but I am tired

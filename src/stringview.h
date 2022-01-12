@@ -28,6 +28,7 @@ bool svFirstIndexOf(StringView src, StringView str, size_t* outIdx);
 int svCmp(StringView a, StringView b);
 char svPeek(StringView sv, size_t n);
 uint32_t svHash(StringView sv);
+bool svToCStr(StringView sv, char* outBuf, size_t* outEnd);
 int64_t svParseI64(StringView sv);
 uint64_t svParseU64(StringView sv);
 double svParseF64(StringView sv);

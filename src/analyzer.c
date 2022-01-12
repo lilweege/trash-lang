@@ -282,15 +282,23 @@ Expression evaluateCall(const char* filename, AST* call, HashMap* symbolTable) {
         AST* arg1 = args->left; assert(arg1 != NULL);
         Expression arg1val = evaluateExpression(filename, arg1, symbolTable);
         assert(arg1val.type == TYPE_U8);
-        printf("%c", arg1val.value[arg1val.index].u8);
+        putchar(arg1val.value[arg1val.index].u8);
     }
     else if (svCmp(svFromCStr("puts"), call->token.text) == 0) {
         AST* args = call->left; assert(args != NULL);
         AST* arg1 = args->left; assert(arg1 != NULL);
         Expression arg1val = evaluateExpression(filename, arg1, symbolTable);
-        assert(arg1val.type == TYPE_U8);
-        for (size_t i = 0; arg1val.value[i].u8; ++i) {
-            putchar(arg1val.value[i].u8);
+        if (arg1val.type == TYPE_U8) {
+            for (size_t i = 0; arg1val.value[i].u8; ++i) {
+                putchar(arg1val.value[i].u8);
+            }
+        }
+        else if (arg1val.type == TYPE_STR) {
+            // printf(SV_FMT, SV_ARG(arg1val.value->sv));
+            char buf[128];
+            if (svToCStr(arg1val.value->sv, buf, NULL)) {
+                printf("%s", buf);
+            }
         }
     }
     else {
