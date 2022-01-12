@@ -2,7 +2,7 @@
 
 My first programming language written from scratch in C
 
-... TODO: put some cool stuff here
+NOTE: This is very much an unfinished work in progess (as evident by the mess of code in `src`). It only barely works with a few of the examples. Many things are subject to change and improve.
 
 ## Quick Start
 
