@@ -24,14 +24,14 @@ typedef union {
 
 typedef struct {
     Type type;
-    size_t arrSize; // 0 if scalar type
+    int64_t index; // 0 if scalar, treat same
     Value* value;
 } Expression;
 
 typedef struct {
     StringView id;
     Type type;
-    size_t arrSize; // 0 if scalar type
+    int64_t arrSize; // -1 if scalar type
     Value* value; // simulation
     // mem addr
     // ...
@@ -41,13 +41,13 @@ typedef struct {
 
 const char* typeKindName(Type type);
 
-void verifyProgram(AST* program);
+void verifyProgram(const char* filename, AST* program);
 
-void simulateProgram(AST* program);
-void simulateStatements(AST* statement, HashMap* symbolTable);
-void simulateStatement(AST* statement, HashMap* symbolTable);
-void simulateConditional(AST* conditional, HashMap* symbolTable);
-Expression evaluateExpression(AST* expression, HashMap* symbolTable);
-Expression evaluateCall(AST* call, HashMap* symbolTable);
+void simulateProgram(const char* filename, AST* program);
+void simulateStatements(const char* filename, AST* statement, HashMap* symbolTable);
+void simulateStatement(const char* filename, AST* statement, HashMap* symbolTable);
+void simulateConditional(const char* filename, AST* conditional, HashMap* symbolTable);
+Expression evaluateExpression(const char* filename, AST* expression, HashMap* symbolTable);
+Expression evaluateCall(const char* filename, AST* call, HashMap* symbolTable);
 
 #endif // ANALYZER_H

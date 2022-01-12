@@ -59,8 +59,8 @@ void compileFilename(char* filename) {
         .source = fileView,
     };
     AST* program = parseProgram(&tokenizer);
-    verifyProgram(program);
-    simulateProgram(program);
+    verifyProgram(filename, program);
+    simulateProgram(filename, program);
 
     free(fileContent);
 }
