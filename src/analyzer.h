@@ -6,6 +6,7 @@
 
 typedef enum {
     TYPE_NONE, // placeholder
+    TYPE_STR, // StringView
     TYPE_U8, // uint8_t
     TYPE_I64, // int64_t
     TYPE_F64, // double
@@ -16,6 +17,7 @@ typedef enum {
 // more generally, this should be a pointer to some actual data
 // something large such as an array on the stack makes this not work
 typedef union {
+    StringView sv;
     uint8_t u8;
     int64_t i64;
     double f64;

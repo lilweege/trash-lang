@@ -1,4 +1,5 @@
 
 u8[13] hw;
 hw = "hello world\n";
+hw[7] = '0';
 puts(hw);

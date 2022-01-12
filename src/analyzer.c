@@ -14,8 +14,9 @@ bool isIntegral(Expression expr) {
 
 
 const char* typeKindName(Type type) {
-    static_assert(TYPE_COUNT == 4, "Exhaustive check of type kinds failed");
-    const char* TypeKindNames[4] = {
+    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
+    const char* TypeKindNames[5] = {
+        "TYPE_STR",
         "TYPE_NONE",
         "TYPE_U8",
         "TYPE_I64",
@@ -193,25 +194,49 @@ void simulateStatement(const char* filename, AST* statement, HashMap* symbolTabl
             compileError((FileInfo) { filename, lval->token.pos },
                          "Cannot assign to undefined variable \""SV_FMT"\"", SV_ARG(lval->token.text));
         }
-        if (lval->left == NULL && symbol->arrSize != -1) {
-            // no lval subscript and symbol is array
-            compileError((FileInfo) { filename, lval->token.pos },
-                         "Cannot assign value to array \""SV_FMT"\"", SV_ARG(lval->token.text));
-        }
+        // if (lval->left == NULL && symbol->arrSize != -1) {
+        //     // no lval subscript and symbol is array
+        //     compileError((FileInfo) { filename, lval->token.pos },
+        //                  "Cannot assign value to array \""SV_FMT"\"", SV_ARG(lval->token.text));
+        // }
         if (lval->left != NULL && symbol->arrSize == -1) {
             // TODO: move this error to eval expr
             compileError((FileInfo) { filename, lval->token.pos },
                          "Cannot take subscript of scalar value \""SV_FMT"\"", SV_ARG(lval->token.text));
         }
         Expression result = evaluateExpression(filename, statement->right, symbolTable);
-        if (symbol->type != result.type) {
+        // special case string
+        bool stringAssign = symbol->type == TYPE_U8 && symbol->arrSize != -1 && result.type == TYPE_STR;
+        if (symbol->type != result.type && !stringAssign) {
             // TODO: better error
             compileError((FileInfo) { filename, lval->token.pos },
                          "Cannot assign \""SV_FMT"\" due to mismatched types", SV_ARG(lval->token.text));
             exit(1);
         }
         // ...
-        if (symbol->arrSize == -1) { // scalar
+        if (stringAssign) {
+            size_t numEscapeChars = 0;
+            size_t sz = result.value->sv.size;
+            for (size_t i = 0; i < sz; ++i) {
+                char ch = result.value->sv.data[i];
+                if (ch == '\\') {
+                    ++numEscapeChars;
+                    if (++i >= sz) {
+                        break;
+                    }
+                    char escapeChar = result.value->sv.data[i];
+                    switch (escapeChar) {
+                        case '"': ch = '"'; break;
+                        case 'n': ch = '\n'; break;
+                        case 't': ch = '\t'; break;
+                        default: assert(0 && "Unhandled escape character");
+                    }
+                }
+                symbol->value[i - numEscapeChars].u8 = ch;
+            }
+            symbol->value[sz - numEscapeChars].u8 = 0;
+        }
+        else if (symbol->arrSize == -1) { // scalar
             // assert(result.index == -1);
             symbol->value[0] = result.value[result.index];
         }
@@ -258,6 +283,15 @@ Expression evaluateCall(const char* filename, AST* call, HashMap* symbolTable) {
         Expression arg1val = evaluateExpression(filename, arg1, symbolTable);
         assert(arg1val.type == TYPE_U8);
         printf("%c", arg1val.value[arg1val.index].u8);
+    }
+    else if (svCmp(svFromCStr("puts"), call->token.text) == 0) {
+        AST* args = call->left; assert(args != NULL);
+        AST* arg1 = args->left; assert(arg1 != NULL);
+        Expression arg1val = evaluateExpression(filename, arg1, symbolTable);
+        assert(arg1val.type == TYPE_U8);
+        for (size_t i = 0; arg1val.value[i].u8; ++i) {
+            putchar(arg1val.value[i].u8);
+        }
     }
     else {
         printf("ERROR: UNKNOWN FUNCTION\n");
@@ -315,7 +349,15 @@ Expression evaluateExpression(const char* filename, AST* expression, HashMap* sy
         return evaluateCall(filename, expression, symbolTable);
     }
     if (expression->kind == NODE_STRING) {
-        assert(0 && "Strings are not implemented yet");
+        // assert(0 && "Strings are not implemented yet");
+        // TODO: escape characters
+        Value* val = newValue(1);
+        val->sv = expression->token.text;
+        return (Expression) {
+            .type = TYPE_STR,
+            .index = 0,
+            .value = val,
+        };
     }
     if (expression->kind == NODE_LVALUE) {
         int64_t index = 0;
