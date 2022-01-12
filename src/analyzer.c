@@ -58,7 +58,7 @@ if  l -> condition SIMULATE CONDITIONAL
 
 
 // TODO: this too
-#define VALUE_SCRATCH_SIZE 1024
+#define VALUE_SCRATCH_SIZE (1<<18)
 Value valueScratchBuffer[VALUE_SCRATCH_SIZE];
 size_t valueScratchBufferSize = 0;
 Value* newValue(size_t num) {
@@ -125,6 +125,9 @@ void simulateConditional(const char* filename, AST* conditional, HashMap* symbol
             // TODO
             // assert(0);
             simulateStatement(filename, body, symbolTable);
+        }
+        if (conditional->kind == NODE_IF) {
+            break;
         }
     }
     dep -= 1;
