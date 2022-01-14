@@ -8,8 +8,80 @@
 #include <stdlib.h>
 
 
-bool isIntegral(Expression expr) {
-    return (expr.type == TYPE_I64 || expr.type == TYPE_U8);
+bool isIntegral(Type type) {
+    return type == TYPE_I64 || type == TYPE_U8;
+}
+
+Type unaryResultType(Type type, NodeKind op) {
+    switch (op) {
+        case NODE_NEG: // NOTE: neg unsigned is allowed
+        case NODE_NOT:
+            return type == TYPE_STR ?
+                    TYPE_NONE : TYPE_U8;
+        default: break;
+    }
+    return TYPE_NONE; // unsupported
+}
+
+Type binaryResultType(Type type1, Type type2, NodeKind op) {
+    if (type1 == TYPE_NONE || type2 == TYPE_NONE) {
+        // cannot operate on none type (void)
+        return TYPE_NONE;
+    }
+
+    // all operations are commutative
+    // therefore only consider one triangle of matrix
+    // reduce combinatorial explosion
+    if (type1 > type2) {
+        Type t = type1;
+        type1 = type2;
+        type2 = t;
+    }
+    assert(type2 >= type1);
+
+    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
+
+    switch (op) {
+        case NODE_EQ:
+        case NODE_NE:
+        case NODE_GE:
+        case NODE_GT:
+        case NODE_LE:
+        case NODE_LT:
+        case NODE_AND:
+        case NODE_OR:
+            return (type1 == TYPE_STR || type2 == TYPE_STR) ?
+                    TYPE_NONE : TYPE_U8;
+        case NODE_ADD:
+        case NODE_SUB:
+        case NODE_MUL:
+        case NODE_DIV: {
+            if (type1 == TYPE_STR || type2 == TYPE_STR)
+                return TYPE_NONE;
+            
+            if (type1 == TYPE_F64 || type2 == TYPE_F64)
+                return TYPE_F64;
+            if (type1 == TYPE_I64 || type2 == TYPE_I64)
+                return TYPE_I64;
+            if (type1 == TYPE_U8 || type2 == TYPE_U8)
+                return TYPE_U8;
+            return TYPE_NONE; // probably unreachable
+        }
+        case NODE_MOD: {
+            if (type1 == TYPE_STR || type2 == TYPE_STR)
+                return TYPE_NONE;
+            if (type1 == TYPE_F64 || type2 == TYPE_F64)
+                return TYPE_NONE;
+            
+            if (type1 == TYPE_I64 || type2 == TYPE_I64)
+                return TYPE_I64;
+            if (type1 == TYPE_U8 || type2 == TYPE_U8)
+                return TYPE_U8;
+            return TYPE_NONE; // probably unreachable
+        }
+        default: break;
+    }
+    return TYPE_NONE; // unsupported
 }
 
 
@@ -26,11 +98,19 @@ const char* typeKindName(Type type) {
 }
 
 void verifyProgram(const char* filename, AST* program) {
-    (void) filename;
-    // TODO
     assert(program != NULL);
     assert(program->kind == NODE_PROGRAM);
+
+    HashMap symbolTable = hmNew(256);
+    verifyStatements(filename, program->right, &symbolTable);
+
+    hmFree(symbolTable);
 }
+
+void verifyStatements(const char* filename, AST* statement, HashMap* symbolTable) {
+    // ...
+}
+
 
 void simulateProgram(const char* filename, AST* program) {
     HashMap symbolTable = hmNew(256);
@@ -154,7 +234,7 @@ void simulateStatement(const char* filename, AST* statement, HashMap* symbolTabl
         
         if (index != NULL) {
             Expression size = evaluateExpression(filename, index, symbolTable);
-            if (!isIntegral(size)) {
+            if (!isIntegral(size.type)) {
                 compileError((FileInfo) { filename, type.pos },
                              "Array size must be an integal type");
             }
@@ -243,7 +323,7 @@ void simulateStatement(const char* filename, AST* statement, HashMap* symbolTabl
         else {
             assert(lval->left != NULL);
             Expression index = evaluateExpression(filename, lval->left, symbolTable);
-            if (!isIntegral(index)) {
+            if (!isIntegral(index.type)) {
                 compileError((FileInfo) { filename, lval->left->token.pos },
                              "Array index must be an integral type", SV_ARG(lval->left->token.text));
             }
@@ -374,7 +454,7 @@ Expression evaluateExpression(const char* filename, AST* expression, HashMap* sy
             // printf("expression->left = %p\n", (void*) expression->left);
             // array subscript
             Expression size = evaluateExpression(filename, expression->left, symbolTable);
-            if (!isIntegral(size)) {
+            if (!isIntegral(size.type)) {
                 compileError((FileInfo) { filename, expression->left->token.pos },
                              "Array index must be an integral type", SV_ARG(expression->token.text));
             }
@@ -406,7 +486,7 @@ Expression evaluateExpression(const char* filename, AST* expression, HashMap* sy
     if (expression->right == NULL) {
         // unary
         Expression l = evaluateExpression(filename, expression->left, symbolTable);
-        if (!isIntegral(l)) {
+        if (!isIntegral(l.type)) {
             printf("ERROR: INVALID TYPE FOR BINARY OPERATOR\n");
             exit(1);
         }
@@ -421,7 +501,7 @@ Expression evaluateExpression(const char* filename, AST* expression, HashMap* sy
         // binary
         Expression l = evaluateExpression(filename, expression->left, symbolTable);
         Expression r = evaluateExpression(filename, expression->right, symbolTable);
-        if (!isIntegral(l) || !isIntegral(r)) {
+        if (!isIntegral(l.type) || !isIntegral(r.type)) {
             printf("ERROR: INVALID TYPE FOR BINARY OPERATOR\n");
             exit(1);
         }
@@ -445,7 +525,7 @@ Expression evaluateExpression(const char* filename, AST* expression, HashMap* sy
         }
     }
     
-    Value* val = newValue(1);
+    Value* val = newValue(1); // BAD!
     val->i64 = result;
     return (Expression) {
         .type = TYPE_I64,

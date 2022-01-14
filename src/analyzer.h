@@ -44,6 +44,7 @@ typedef struct {
 const char* typeKindName(Type type);
 
 void verifyProgram(const char* filename, AST* program);
+void verifyStatements(const char* filename, AST* statement, HashMap* symbolTable);
 
 void simulateProgram(const char* filename, AST* program);
 void simulateStatements(const char* filename, AST* statement, HashMap* symbolTable);
