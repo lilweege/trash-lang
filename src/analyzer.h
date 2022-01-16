@@ -32,8 +32,8 @@ const char* typeKindKeyword(TypeKind type);
 
 void verifyProgram(const char* filename, AST* program);
 void verifyStatements(const char* filename, AST* statement, HashMap* symbolTable);
-void verifyStatement(const char* filename, AST* statement, HashMap* symbolTable);
-void verifyConditional(const char* filename, AST* conditional, HashMap* symbolTable);
+void verifyConditional(const char* filename, AST* statement, HashMap* symbolTable);
+void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable);
 Type checkCall(const char* filename, AST* call, HashMap* symbolTable);
 Type checkExpression(const char* filename, AST* expression, HashMap* symbolTable);
 

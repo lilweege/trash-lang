@@ -129,24 +129,32 @@ void verifyStatements(const char* filename, AST* statement, HashMap* symbolTable
         return;
     }
 
-    // TODO: else
     AST* toCheck = statement->left;
+    AST* nextStatement = statement->right;
     if (toCheck->kind == NODE_WHILE || toCheck->kind == NODE_IF || toCheck->kind == NODE_ELSE) {
-        verifyConditional(filename, toCheck, symbolTable);
+        verifyConditional(filename, statement, symbolTable);
     }
     else {
-        verifyStatement(filename, toCheck, symbolTable);
+        verifyStatement(filename, statement, symbolTable);
     }
-    AST* nextStatement = statement->right;
     verifyStatements(filename, nextStatement, symbolTable);
 }
 
-void verifyConditional(const char* filename, AST* conditional, HashMap* symbolTable) {
-    // TODO: else
-    AST* body = conditional->right;
-    assert(body != NULL);
+void verifyConditional(const char* filename, AST* statement, HashMap* symbolTable) {
+    AST* conditional = statement->left;
+    assert(conditional != NULL);
+
     AST* condition = conditional->left;
-    if (condition != NULL) { // if / while
+    if (conditional->kind == NODE_IF) {
+        AST* left = conditional->left;
+        assert(left != NULL);
+        if (left->kind == NODE_ELSE) {
+            verifyConditional(filename, conditional, symbolTable);
+            condition = NULL;
+        }
+    }
+
+    if (condition != NULL) {
         Type conditionType = checkExpression(filename, condition, symbolTable);
         if (!isScalar(conditionType) || (!isIntegral(conditionType.kind) && conditionType.kind != TYPE_F64)) {
             // invalid type (void, string, array)
@@ -155,22 +163,25 @@ void verifyConditional(const char* filename, AST* conditional, HashMap* symbolTa
         }
     }
     
+    AST* body = conditional->right;
+    assert(body != NULL);
+    HashMap innerScope = hmCopy(*symbolTable);
     if (body->kind == NODE_BLOCK) {
         AST* first = body->right;
-        HashMap innerScope = hmCopy(*symbolTable);
         verifyStatements(filename, first, &innerScope);
-        hmFree(innerScope);
     }
     else {
         verifyStatement(filename, body, symbolTable);
     }
+    hmFree(innerScope);
 }
 
 
-void verifyStatement(const char* filename, AST* statement, HashMap* symbolTable) {
+void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
+    AST* statement = wrapper->left;
     assert(statement != NULL);
     if (statement->kind == NODE_WHILE || statement->kind == NODE_IF) {
-        verifyConditional(filename, statement, symbolTable);
+        verifyConditional(filename, wrapper, symbolTable);
     }
     else if (statement->kind == NODE_DEFINITION) {
         Token id = statement->token;
