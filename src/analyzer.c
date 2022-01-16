@@ -118,10 +118,8 @@ void verifyProgram(const char* filename, AST* program) {
     assert(program != NULL);
     assert(program->kind == NODE_PROGRAM);
 
-    // TODO: scopes
     HashMap symbolTable = hmNew(256);
     verifyStatements(filename, program->right, &symbolTable);
-
     hmFree(symbolTable);
 }
 
@@ -159,7 +157,9 @@ void verifyConditional(const char* filename, AST* conditional, HashMap* symbolTa
     
     if (body->kind == NODE_BLOCK) {
         AST* first = body->right;
-        verifyStatements(filename, first, symbolTable);
+        HashMap innerScope = hmCopy(*symbolTable);
+        verifyStatements(filename, first, &innerScope);
+        hmFree(innerScope);
     }
     else {
         verifyStatement(filename, body, symbolTable);
