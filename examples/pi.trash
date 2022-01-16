@@ -2,7 +2,7 @@ i64 N; N = 10 * 1000 * 1000;
 
 i64 i; i = 0;
 i64 sign; sign = 1;
-f64 pi; pi = 0;
+f64 pi; pi = 0.;
 
 while (i < N) {
     pi = pi + sign * (1.0 / ((2*i) + 1));

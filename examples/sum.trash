@@ -9,4 +9,3 @@ while (i <= N) {
 
 puti(s);
 putc('\n');
-
