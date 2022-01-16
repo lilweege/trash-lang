@@ -135,7 +135,14 @@ AST* parseBranch(Tokenizer* tokenizer) {
     }
     NodeKind branchKind =
         tokenizer->nextToken.kind == TOKEN_IF ? NODE_IF :
-        tokenizer->nextToken.kind == TOKEN_ELSE ? NODE_ELSE : NODE_WHILE;
+        tokenizer->nextToken.kind == TOKEN_WHILE ? NODE_WHILE : NODE_ELSE;
+
+    if (branchKind == NODE_ELSE) {
+        // else should already be handled and skipped
+        compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
+                     "`else` without previous `if`");
+    }
+
     AST* branch = newNode(branchKind, tokenizer->nextToken);
     tokenizer->nextToken.kind = TOKEN_NONE;
 
@@ -143,40 +150,65 @@ AST* parseBranch(Tokenizer* tokenizer) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
-    bool hasCondition = branchKind == NODE_IF || branchKind == NODE_WHILE;
-    if (hasCondition) {
-        if (tokenizer->nextToken.kind != TOKEN_LPAREN) {
-            compileError((FileInfo) { tokenizer->filename, branch->token.pos },
-                         "Expected ( after token");
-        }
-        tokenizer->nextToken.kind = TOKEN_NONE;
-        
-        branch->left = parseExpression(tokenizer);
-        if (branch->left == NULL) {
-            compileError((FileInfo) { tokenizer->filename, branch->token.pos },
-                         "Invalid expression after (");
-        }
-        
-        if (!pollToken(tokenizer)) {
-            compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
-                         "Unexpected end of file");
-        }
-        if (tokenizer->nextToken.kind != TOKEN_RPAREN) {
-            compileError((FileInfo) { tokenizer->filename, branch->token.pos },
-                         "Expected ) after expression");
-        }
-        tokenizer->nextToken.kind = TOKEN_NONE;
-    }
-    
-    branch->right = parseBlock(tokenizer);
-    if (branch->right == NULL) {
-        branch->right = parseStatement(tokenizer);
-    }
-    if (branch->right == NULL) {
+    if (tokenizer->nextToken.kind != TOKEN_LPAREN) {
         compileError((FileInfo) { tokenizer->filename, branch->token.pos },
-                     "Expected conditional body");
+                     "Expected ( after token");
     }
+    tokenizer->nextToken.kind = TOKEN_NONE;
+    
+    branch->left = parseExpression(tokenizer);
+    if (branch->left == NULL) {
+        compileError((FileInfo) { tokenizer->filename, branch->token.pos },
+                     "Invalid expression after (");
+    }
+
+    if (!pollToken(tokenizer)) {
+        compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
+                     "Unexpected end of file");
+    }
+    if (tokenizer->nextToken.kind != TOKEN_RPAREN) {
+        compileError((FileInfo) { tokenizer->filename, branch->token.pos },
+                     "Expected ) after expression");
+    }
+    tokenizer->nextToken.kind = TOKEN_NONE;
+    
+
+#define tryGetBody(node) do {                                                           \
+        (node)->right = parseBlock(tokenizer);                                          \
+        if ((node)->right == NULL) {                                                    \
+            (node)->right = newNode(NODE_STATEMENT, (Token){0});                        \
+            (node)->right->left = parseStatement(tokenizer);                            \
+        }                                                                               \
+        if ((node)->right == NULL) {                                                    \
+            compileError((FileInfo) { tokenizer->filename, (node)->token.pos },         \
+                        "Expected conditional body");                                   \
+        }                                                                               \
+    } while (0)
+
+
+    tryGetBody(branch);
+
+    if (branchKind == NODE_IF) {
+        // try to get matching else
+        // defer condition to else->left so that if->left can point to eles
+        if (!pollToken(tokenizer)) return branch;
+        if (tokenizer->nextToken.kind == TOKEN_ELSE) {
+            // found matching else
+            tokenizer->nextToken.kind = TOKEN_NONE;
+            // modify the tree so if/else can be matched easily
+            // if `if` has corresponding `else`:
+                // if->left points to else
+                // defer condition to else->left (which would have been NULL otherwise)
+            AST* branchElse = newNode(NODE_ELSE, tokenizer->nextToken);
+            AST* condition = branch->left;
+            branch->left = branchElse;
+            branchElse->left = condition; // deferred condition
+            tryGetBody(branchElse);
+        }
+    }
+
     return branch;
+#undef tryGetBody
 }
 
 
