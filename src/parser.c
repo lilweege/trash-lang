@@ -509,6 +509,7 @@ AST* parseCall(Tokenizer* original) {
         assert(pollToken(tokenizer)); // redundant
         if (tokenizer->nextToken.kind == TOKEN_RPAREN) {
             tokenizer->nextToken.kind = TOKEN_NONE;
+            *original = current;
             return call;
         }
         else {
