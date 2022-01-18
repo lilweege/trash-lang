@@ -138,15 +138,23 @@ void simulateConditional(AST* statement, HashMap* symbolTable) {
 }
 
 void simulateBlock(AST* body, HashMap* symbolTable) {
-    HashMap innerScope = hmCopy(*symbolTable);
+    // FIXME:
+    // FIXME:
+    // FIXME:
+    // FIXME: THIS IS SO SLOW PLEASE FIX THIS
+    // FIXME:
+    // FIXME:
+    // FIXME:
+    // HashMap innerScope = hmCopy(*symbolTable);
     if (body->kind == NODE_BLOCK) {
         AST* first = body->right;
-        simulateStatements(first, &innerScope);
+        // simulateStatements(first, &innerScope);
+        simulateStatements(first, symbolTable);
     }
     else {
         simulateStatement(body, symbolTable);
     }
-    hmFree(innerScope);
+    // hmFree(innerScope);
 }
 
 void simulateStatement(AST* wrapper, HashMap* symbolTable) {
