@@ -145,12 +145,15 @@ void verifyConditional(const char* filename, AST* statement, HashMap* symbolTabl
     assert(conditional != NULL);
 
     AST* condition = conditional->left;
-    if (conditional->kind == NODE_IF) {
+    if (conditional->kind == NODE_ELSE) {
+        condition = NULL;
+    }
+    else if (conditional->kind == NODE_IF) {
         AST* left = conditional->left;
         assert(left != NULL);
         if (left->kind == NODE_ELSE) {
             verifyConditional(filename, conditional, symbolTable);
-            condition = NULL;
+            condition = left->left;
         }
     }
 
@@ -212,7 +215,12 @@ void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
 
         Symbol newVar = (Symbol) {
             .id = id.text,
-            .type = { .kind = assignTypeKind, .size = hasSubscript ? 1 : 0 },
+            .val = {
+                .type = {
+                    .kind = assignTypeKind,
+                    .size = hasSubscript ? 1 : 0
+                },
+            }
         };
         hmPut(symbolTable, newVar);
     }
@@ -387,7 +395,7 @@ Type checkExpression(const char* filename, AST* expression, HashMap* symbolTable
 
         AST* subscript = expression->left;
         bool hasSubscript = subscript != NULL;
-        bool varIsScalar = var->type.size == 0;
+        bool varIsScalar = var->val.type.size == 0;
         if (hasSubscript) {
             // array subscript
             if (varIsScalar) {
@@ -409,7 +417,7 @@ Type checkExpression(const char* filename, AST* expression, HashMap* symbolTable
             // no subscript -> scalar
             // subscript -> illegal
         return (Type) {
-            .kind = var->type.kind,
+            .kind = var->val.type.kind,
             .size = (!varIsScalar && !hasSubscript) ? 1 : 0,
         };
     }

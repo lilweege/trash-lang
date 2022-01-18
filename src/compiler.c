@@ -4,6 +4,7 @@
 #include "tokenizer.h"
 #include "parser.h"
 #include "analyzer.h"
+#include "simulator.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,6 +61,7 @@ void compileFilename(char* filename) {
     };
     AST* program = parseProgram(&tokenizer);
     verifyProgram(filename, program);
+    // simulateProgram(filename, program, STACK_SIZE);
 
     free(fileContent);
 }

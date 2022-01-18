@@ -1,7 +1,6 @@
 #ifndef ANALYZER_H
 #define ANALYZER_H
 
-#include "stringview.h"
 #include "parser.h"
 
 typedef enum {
@@ -20,9 +19,13 @@ typedef struct {
 } Type;
 
 typedef struct {
-    StringView id;
     Type type;
-    // TODO: mem addr for simulation
+    size_t offset; // from stack base
+} Value;
+
+typedef struct {
+    StringView id;
+    Value val;
 } Symbol;
 
 #include "hashmap.h"

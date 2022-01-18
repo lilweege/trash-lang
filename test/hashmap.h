@@ -43,18 +43,17 @@ void testHashmap() {
     puts("==== TEST HASHMAP ====");
 
     srand((int)time(NULL));
-    HashMap hm = hmNew(16381);
-    // HashMap hm = hmNew(101);
+    HashMap hm = hmNew(1<<14);
 
     for (size_t i = 0; i < NUM_KEYS; ++i) {
         do {
             keys[i] = newRandomKey(randint(MIN_STRLEN, MAX_STRLEN));
         } while (hmGet(&hm, keys[i]) != NULL);
-        assert(hmPut(&hm, (Pair) { .key = keys[i], rand() }));
+        assert(hmPut(&hm, (Pair) { .key = keys[i], .val = {{rand()}} }));
     }
 
     for (size_t i = 0; i < NUM_KEYS; ++i) {
-        Pair p = (Pair) { .key = keys[i], rand() };
+        Pair p = (Pair) { .key = keys[i], .val = {{rand()}} };
         Hint hnt = hmFind(&hm, p);
         assert(hnt.found);
         if (hmHintGet(&hm, hnt) == NULL) {
