@@ -259,6 +259,15 @@ bool pollToken(Tokenizer* tokenizer) {
             tokenizer->curPos.col += 2; // quotes are not included in string literal token
             tokenizer->nextToken.kind = delim == '"' ? TOKEN_STRING_LITERAL : TOKEN_CHAR_LITERAL;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
+            if (tokenizer->nextToken.kind == TOKEN_CHAR_LITERAL) {
+                if ((tokenizer->nextToken.text.size == 2 && tokenizer->nextToken.text.data[0] != '\\') ||
+                        tokenizer->nextToken.text.size > 2) {
+                    compileErrorAt(tokenizer->filename,
+                                   tokenizer->nextToken.pos.line,
+                                   tokenizer->nextToken.pos.col + 1,
+                                   "Max length of character literal exceeded");
+                }
+            }
             svLeftChop(&tokenizer->source, 1); // close quote
         } break;
 

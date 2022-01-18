@@ -137,21 +137,22 @@ bool svToCStr(StringView sv, char* outBuf, size_t* outEnd) {
         if (ch == '\\') {
             ++escaped;
             if (++i >= sz) {
-                break;
+                return false;
             }
             char esc = sv.data[i];
             switch (esc) {
                 case '"': ch = '"'; break;
                 case 'n': ch = '\n'; break;
                 case 't': ch = '\t'; break;
+                case '\\': ch = '\\'; break;
                 default: return false;
             }
         }
         outBuf[i-escaped] = ch;
     }
-    outBuf[i-escaped] = 0;
+    outBuf[sz-escaped] = 0;
     if (outEnd != NULL) {
-        *outEnd = i-escaped;
+        *outEnd = sz-escaped;
     }
     return true;
 }
