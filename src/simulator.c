@@ -9,7 +9,7 @@ size_t stackSize;
 size_t stackTop;
 uint8_t* stack;
 
-// TODO: fix alignment
+// TODO: use sizeof ptr
 #define MAX_ALIGN 8
 size_t stackPush(size_t numBytes) {
     size_t start = stackTop;
@@ -20,6 +20,7 @@ size_t stackPush(size_t numBytes) {
 }
 
 void stackPop(size_t restoreIdx) {
+    restoreIdx += MAX_ALIGN - ((restoreIdx-1) & (MAX_ALIGN-1)) - 1;
     assert(restoreIdx <= stackTop);
     stackTop = restoreIdx;
 }
@@ -183,13 +184,10 @@ void simulateStatement(AST* wrapper, HashMap* symbolTable) {
     else if (statement->kind == NODE_ASSIGN) {
         AST* lvalNode = statement->left;
         AST* rvalNode = statement->right;
-        Token id = lvalNode->token;
-        Symbol* var = hmGet(symbolTable, id.text);
-        Value lval = var->val;
+        Value lval = evaluateExpression(lvalNode, symbolTable);
         Value rval = evaluateExpression(rvalNode, symbolTable);
         // NOTE: I don't think it's possible for rval to share memory with lval
         // memcpy is probably safe here, but use memmove here just to be certain
-        assert(lval.type.size == rval.type.size && lval.type.kind == rval.type.kind); // TBD
         memmove(valueAddr(lval), valueAddr(rval), typeSize(lval.type));
     }
     else {
