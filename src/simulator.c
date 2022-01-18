@@ -10,9 +10,10 @@ size_t stackTop;
 uint8_t* stack;
 
 // TODO: fix alignment
+#define MAX_ALIGN 8
 size_t stackPush(size_t numBytes) {
     size_t start = stackTop;
-    numBytes += 8 - ((numBytes-1) & 7) - 1;
+    numBytes += MAX_ALIGN - ((numBytes-1) & (MAX_ALIGN-1)) - 1;
     stackTop += numBytes;
     assert(stackTop < stackSize-1);
     return start;
@@ -217,6 +218,9 @@ Value evaluateCall(AST* call, HashMap* symbolTable) {
     else if (svCmp(svFromCStr("putc"), call->token.text) == 0) {
         putchar(CAST_VALUE(uint8_t, arguments[0]));
     }
+    else if (svCmp(svFromCStr("puts"), call->token.text) == 0) {
+        printf("%s", valueAddr(arguments[0]));
+    }
     else {
         assert(0 && "Unimplemented");
     }
@@ -263,7 +267,7 @@ Value evaluateExpression(AST* expression, HashMap* symbolTable) {
             stackPush(src.size);
             size_t end;
             // possibly redundant copy
-            assert(svToCStr(expression->token.text, CAST_VALUE(char*, lit), &end));
+            assert(svToCStr(expression->token.text, &CAST_VALUE(char, lit), &end));
             // shrink extra space used by escape chars
             stackPop(stackTop - (src.size - end));
         }
