@@ -18,33 +18,39 @@ bool isScalar(Type type) {
 
 
 TypeKind unaryResultTypeKind(TypeKind type, NodeKind op) {
+    if (type == TYPE_NONE || type == TYPE_STR) {
+        return TYPE_NONE;
+    }
     switch (op) {
         case NODE_NEG: // NOTE: neg unsigned is allowed
         case NODE_NOT:
-            return type == TYPE_STR ?
-                    TYPE_NONE : type;
+            return type;
         default: break;
     }
     return TYPE_NONE; // unsupported
 }
 
 TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op) {
-    if (type1 == TYPE_NONE || type2 == TYPE_NONE) {
-        // cannot operate on none type (void)
+    if (type1 == TYPE_NONE || type2 == TYPE_NONE ||
+        type1 == TYPE_STR || type2 == TYPE_STR) {
+        // cannot operate on none type (void) or string literal
         return TYPE_NONE;
     }
 
-    // all operations are commutative
-    // therefore only consider one triangle of matrix
-    // reduce combinatorial explosion
-    if (type1 > type2) {
+    // this is a nasty trick which greatly reduces the combinatorial explosion in simulator.c (yay macros)
+    // of course all binary operations must be commutative
+    // additionally, it depends on the order of the TypeKind enum in conjunction with the fact that 
+    // according to my upcasting rules, the max of both type enums is the type to cast to
+    // this will almost definitely break when more types are introduced
+    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
+
+    if (type1 < type2) {
         TypeKind t = type1;
         type1 = type2;
         type2 = t;
     }
-    assert(type2 >= type1);
+    assert(type1 >= type2);
 
-    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
 
     switch (op) {
         case NODE_EQ:
@@ -55,34 +61,31 @@ TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op) {
         case NODE_LT:
         case NODE_AND:
         case NODE_OR:
-            return (type1 == TYPE_STR || type2 == TYPE_STR) ?
-                    TYPE_NONE : TYPE_U8;
+            return TYPE_U8;
         case NODE_ADD:
         case NODE_SUB:
         case NODE_MUL:
         case NODE_DIV: {
-            if (type1 == TYPE_STR || type2 == TYPE_STR)
-                return TYPE_NONE;
-            
-            if (type1 == TYPE_F64 || type2 == TYPE_F64)
-                return TYPE_F64;
-            if (type1 == TYPE_I64 || type2 == TYPE_I64)
-                return TYPE_I64;
-            if (type1 == TYPE_U8 || type2 == TYPE_U8)
-                return TYPE_U8;
-            return TYPE_NONE; // probably unreachable
+            return type1; // NASTY TRICK...
+
+            // if (type1 == TYPE_F64 || type2 == TYPE_F64)
+            //     return TYPE_F64;
+            // if (type1 == TYPE_I64 || type2 == TYPE_I64)
+            //     return TYPE_I64;
+            // if (type1 == TYPE_U8 || type2 == TYPE_U8)
+            //     return TYPE_U8;
+            // return TYPE_NONE; // probably unreachable
         }
         case NODE_MOD: {
-            if (type1 == TYPE_STR || type2 == TYPE_STR)
-                return TYPE_NONE;
             if (type1 == TYPE_F64 || type2 == TYPE_F64)
                 return TYPE_NONE;
-            
-            if (type1 == TYPE_I64 || type2 == TYPE_I64)
-                return TYPE_I64;
-            if (type1 == TYPE_U8 || type2 == TYPE_U8)
-                return TYPE_U8;
-            return TYPE_NONE; // probably unreachable
+
+            return type1;
+            // if (type1 == TYPE_I64 || type2 == TYPE_I64)
+            //     return TYPE_I64;
+            // if (type1 == TYPE_U8 || type2 == TYPE_U8)
+            //     return TYPE_U8;
+            // return TYPE_NONE; // probably unreachable
         }
         default: break;
     }
@@ -131,7 +134,7 @@ void verifyStatements(const char* filename, AST* statement, HashMap* symbolTable
 
     AST* toCheck = statement->left;
     AST* nextStatement = statement->right;
-    if (toCheck->kind == NODE_WHILE || toCheck->kind == NODE_IF || toCheck->kind == NODE_ELSE) {
+    if (toCheck->kind == NODE_WHILE || toCheck->kind == NODE_IF) {
         verifyConditional(filename, statement, symbolTable);
     }
     else {
@@ -190,7 +193,6 @@ void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
         Token id = statement->token;
         AST* typeNode = statement->left;
         assert(typeNode != NULL);
-        Token typeName = typeNode->token;
         AST* subscript = typeNode->left;
         bool hasSubscript = subscript != NULL;
         if (hasSubscript) {
@@ -201,8 +203,10 @@ void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
                              "Array size must be an integal type");
             }
         }
+        
         // TODO: determine type enum value during tokenizing rather than here
         // this is a wasteful computation
+        Token typeName = typeNode->token;
         TypeKind assignTypeKind = svCmp(svFromCStr("u8"), typeName.text) == 0 ? TYPE_U8 :
                                 svCmp(svFromCStr("i64"), typeName.text) == 0 ? TYPE_I64 : TYPE_F64;
         
@@ -272,8 +276,6 @@ void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
     }
 }
 
-// arbitrary limit
-#define MAX_FUNC_ARGS 16
 Type checkCall(const char* filename, AST* call, HashMap* symbolTable) {
     // TODO: user defined subroutines
     assert(call != NULL);

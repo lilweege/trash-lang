@@ -61,7 +61,7 @@ void compileFilename(char* filename) {
     };
     AST* program = parseProgram(&tokenizer);
     verifyProgram(filename, program);
-    // simulateProgram(filename, program, STACK_SIZE);
+    simulateProgram(program, STACK_SIZE);
 
     free(fileContent);
 }

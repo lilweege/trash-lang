@@ -30,8 +30,13 @@ typedef struct {
 
 #include "hashmap.h"
 
+// arbitrary limit
+#define MAX_FUNC_ARGS 16
+
 const char* typeKindName(TypeKind type);
 const char* typeKindKeyword(TypeKind type);
+TypeKind unaryResultTypeKind(TypeKind type, NodeKind op);
+TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op);
 
 void verifyProgram(const char* filename, AST* program);
 void verifyStatements(const char* filename, AST* statement, HashMap* symbolTable);
