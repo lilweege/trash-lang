@@ -1,7 +1,8 @@
 
 i64 s; s = 0;
 i64 i; i = 0;
-i64 N; N = 1000*1000*1000;
+? this takes a while to finish
+i64 N; N = 1000*1000;
 while (i <= N) {
     s = s + i;
     i = i + 1;

@@ -13,8 +13,8 @@ uint8_t* stack;
 #define MAX_ALIGN 8
 size_t stackPush(size_t numBytes) {
     size_t start = stackTop;
-    numBytes += MAX_ALIGN - ((numBytes-1) & (MAX_ALIGN-1)) - 1;
     stackTop += numBytes;
+    stackTop += MAX_ALIGN - ((stackTop-1) & (MAX_ALIGN-1)) - 1;
     assert(stackTop < stackSize-1);
     return start;
 }
@@ -102,6 +102,7 @@ void simulateConditional(AST* statement, HashMap* symbolTable) {
         if (hasElse) {
             condition = left->left;
         }
+        size_t stackPos = stackTop;
         Value result = evaluateExpression(condition, symbolTable);
         bool enterIf = isTrue(result);
         if (enterIf) {
@@ -110,21 +111,24 @@ void simulateConditional(AST* statement, HashMap* symbolTable) {
         else if (hasElse) {
             simulateBlock(left->right, symbolTable);
         }
+        stackPop(stackPos);
     }
     else if (conditional->kind == NODE_WHILE) {
         while (true) {
+            size_t stackPos = stackTop;
             Value result = evaluateExpression(condition, symbolTable);
             if (!isTrue(result)) {
+                stackPop(stackPos);
                 break;
             }
             simulateBlock(conditional->right, symbolTable);
+            stackPop(stackPos);
         }
     }
 }
 
 void simulateBlock(AST* body, HashMap* symbolTable) {
     HashMap innerScope = hmCopy(*symbolTable);
-    size_t stackPos = stackTop;
     if (body->kind == NODE_BLOCK) {
         AST* first = body->right;
         simulateStatements(first, &innerScope);
@@ -132,7 +136,6 @@ void simulateBlock(AST* body, HashMap* symbolTable) {
     else {
         simulateStatement(body, symbolTable);
     }
-    stackPop(stackPos);
     hmFree(innerScope);
 }
 
