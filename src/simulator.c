@@ -305,12 +305,13 @@ Value evaluateExpression(AST* expression, HashMap* symbolTable) {
             // other integral types would go here
         }
         size_t resultSize = (!varIsScalar && !hasSubscript) ? var->val.type.size : 0;
+        TypeKind resultKind = var->val.type.kind;
         return (Value) {
             .type = {
-                .kind = var->val.type.kind,
+                .kind = resultKind,
                 .size = resultSize
             },
-            .offset = var->val.offset + arrIndex
+            .offset = var->val.offset + typeKindSize(resultKind) * arrIndex
         };
     }
 
