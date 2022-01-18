@@ -46,17 +46,27 @@ uint8_t* valueAddr(Value val) {
     return stack + val.offset;
 }
 
-#define CAST_VALUE(value_type, value) *((value_type*) valueAddr(value))
+#define CAST_VALUE_RAW(value_type, value) *((value_type*) valueAddr(value))
+
+#define BIND_CAST_VALUE(lvalue, cast_type, value) do { \
+    switch ((value).type.kind) { \
+        case TYPE_I64: lvalue = (cast_type) CAST_VALUE_RAW(int64_t, value); break; \
+        case TYPE_U8: lvalue = (cast_type) CAST_VALUE_RAW(uint8_t, value); break; \
+        case TYPE_F64: lvalue = (cast_type) CAST_VALUE_RAW(double, value); break; \
+        default: assert(0); \
+    } \
+} while (0)
+
 
 bool isTrue(Value val) {
     if (val.type.kind == TYPE_I64) {
-        return CAST_VALUE(int64_t, val) != 0;
+        return CAST_VALUE_RAW(int64_t, val) != 0;
     }
     else if (val.type.kind == TYPE_U8) {
-        return CAST_VALUE(uint8_t, val) != 0;
+        return CAST_VALUE_RAW(uint8_t, val) != 0;
     }
     else if (val.type.kind == TYPE_F64) {
-        return CAST_VALUE(double, val) != 0.0;
+        return CAST_VALUE_RAW(double, val) != 0.0;
     }
     assert(0);
     return false;
@@ -154,13 +164,7 @@ void simulateStatement(AST* wrapper, HashMap* symbolTable) {
         if (hasSubscript) { // array
             Value sizeExpr = evaluateExpression(subscript, symbolTable);
             // size should be an integral type
-            if (sizeExpr.type.kind == TYPE_I64) {
-                arrSize = (size_t) CAST_VALUE(int64_t, sizeExpr);
-            }
-            else {
-                arrSize = (size_t) CAST_VALUE(uint8_t, sizeExpr);
-            }
-            // other integral types would go here
+            BIND_CAST_VALUE(arrSize, size_t, sizeExpr);
         }
         
         if (arrSize == 0 && hasSubscript) {
@@ -214,10 +218,13 @@ Value evaluateCall(AST* call, HashMap* symbolTable) {
     }
 
     if (svCmp(svFromCStr("puti"), call->token.text) == 0) {
-        printf("%ld", CAST_VALUE(int64_t, arguments[0]));
+        printf("%ld", CAST_VALUE_RAW(int64_t, arguments[0]));
+    }
+    else if (svCmp(svFromCStr("putf"), call->token.text) == 0) {
+        printf("%f", CAST_VALUE_RAW(double, arguments[0]));
     }
     else if (svCmp(svFromCStr("putc"), call->token.text) == 0) {
-        putchar(CAST_VALUE(uint8_t, arguments[0]));
+        putchar(CAST_VALUE_RAW(uint8_t, arguments[0]));
     }
     else if (svCmp(svFromCStr("puts"), call->token.text) == 0) {
         printf("%s", valueAddr(arguments[0]));
@@ -268,20 +275,20 @@ Value evaluateExpression(AST* expression, HashMap* symbolTable) {
             stackPush(src.size);
             size_t end;
             // possibly redundant copy
-            assert(svToCStr(expression->token.text, &CAST_VALUE(char, lit), &end));
+            assert(svToCStr(expression->token.text, &CAST_VALUE_RAW(char, lit), &end));
             // shrink extra space used by escape chars
             stackPop(stackTop - (src.size - end));
         }
         else if (expression->kind == NODE_CHAR) {
             char ch;
             assert(svToCStr(expression->token.text, &ch, NULL));
-            CAST_VALUE(uint8_t, lit) = (uint8_t) ch;
+            CAST_VALUE_RAW(uint8_t, lit) = (uint8_t) ch;
         }
         else if (expression->kind == NODE_INTEGER) {
-            CAST_VALUE(int64_t, lit) = svParseI64(expression->token.text);
+            CAST_VALUE_RAW(int64_t, lit) = svParseI64(expression->token.text);
         }
         else {
-            CAST_VALUE(double, lit) = svParseF64(expression->token.text);
+            CAST_VALUE_RAW(double, lit) = svParseF64(expression->token.text);
         }
         return lit;
     }
@@ -299,13 +306,7 @@ Value evaluateExpression(AST* expression, HashMap* symbolTable) {
         if (hasSubscript) {
             Value indexExpr = evaluateExpression(subscript, symbolTable);
             // index should be an integral type
-            if (indexExpr.type.kind == TYPE_I64) {
-                arrIndex = (size_t) CAST_VALUE(int64_t, indexExpr);
-            }
-            else {
-                arrIndex = (size_t) CAST_VALUE(uint8_t, indexExpr);
-            }
-            // other integral types would go here
+            BIND_CAST_VALUE(arrIndex, size_t, indexExpr);
         }
         size_t resultSize = (!varIsScalar && !hasSubscript) ? var->val.type.size : 0;
         TypeKind resultKind = var->val.type.kind;
@@ -334,7 +335,7 @@ Value evaluateExpression(AST* expression, HashMap* symbolTable) {
             .offset = stackPush(typeKindSize(resultKind))
         };
 #define UNARY_KIND_SWITCH_CASE(typeKind, type, unaryOp) \
-        case typeKind: CAST_VALUE(type, result) = unaryOp CAST_VALUE(type, operand); break;
+        case typeKind: CAST_VALUE_RAW(type, result) = unaryOp CAST_VALUE_RAW(type, operand); break;
 #define UNARY_SWITCH_CASE(opKind, unaryOp) \
         case opKind: \
             switch (operand.type.kind) { \
@@ -380,7 +381,13 @@ Value evaluateExpression(AST* expression, HashMap* symbolTable) {
         // I am deeply ashamed of this code ...
 
 #define BINARY_ROP_SWITCH_CASE(rOperandKind, lType, rType, binaryOp) \
-        case rOperandKind: CAST_VALUE(lType, result) = CAST_VALUE(lType, lOperand) binaryOp CAST_VALUE(rType, rOperand); break;
+        case rOperandKind: { \
+            lType lOpRes; \
+            BIND_CAST_VALUE(lOpRes, lType, lOperand); \
+            rType rOpRes; \
+            BIND_CAST_VALUE(rOpRes, rType, rOperand); \
+            CAST_VALUE_RAW(lType, result) = lOpRes binaryOp rOpRes; \
+        } break;
 
 #define BINARY_LOP_SWITCH_CASE_REAL(lOperandKind, lType, binaryOp) \
         case lOperandKind: \
