@@ -26,7 +26,7 @@ void stackPop(size_t restoreIdx) {
 }
 
 size_t typeKindSize(TypeKind kind) {
-    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
+    _Static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
     switch (kind) {
         case TYPE_NONE: return 0; // ??
         // str handled specially, characters go directly on stack
