@@ -177,7 +177,7 @@ void verifyConditional(const char* filename, AST* statement, HashMap* symbolTabl
         verifyStatements(filename, first, &innerScope);
     }
     else {
-        verifyStatement(filename, body, symbolTable);
+        verifyStatement(filename, body, &innerScope);
     }
     hmFree(innerScope);
 }
