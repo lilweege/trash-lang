@@ -4,6 +4,7 @@
 #include "tokenizer.h"
 #include "parser.h"
 #include "analyzer.h"
+#include "generator.h"
 #include "simulator.h"
 
 #include <stdio.h>
@@ -62,7 +63,9 @@ void compileFilename(char* filename) {
     };
     AST* program = parseProgram(&tokenizer);
     verifyProgram(filename, program);
-    simulateProgram(program, STACK_SIZE);
+    // simulateProgram(program, STACK_SIZE);
+    // TODO: get filename and remove extension
+    generateProgram("a", program);
 
     free(fileContent);
 }
