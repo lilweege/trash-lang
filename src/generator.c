@@ -26,13 +26,6 @@ void generateProgram(const char* filename, AST* program) {
     generateStatements(program->right, &symbolTable, &asmWriter);
     hmFree(symbolTable);
 
-
-    fwWriteChunkOrCrash(&asmWriter, "  mov rdi, QWORD [rsp-24]\n");
-    fwWriteChunkOrCrash(&asmWriter, "  call puti\n");
-    fwWriteChunkOrCrash(&asmWriter, "  mov rdi, 10\n");
-    fwWriteChunkOrCrash(&asmWriter, "  call putc\n");
-
-
     fwWriteChunkOrCrash(&asmWriter, "  mov rax, 60\n");
     fwWriteChunkOrCrash(&asmWriter, "  xor rdi, rdi\n");
     fwWriteChunkOrCrash(&asmWriter, "  syscall\n");
@@ -102,10 +95,40 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
 }
 
 Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
-    (void) call;
-    (void) symbolTable;
-    (void) asmWriter;
-    return (Value) {0};
+    AST* args = call->left;
+    Value arguments[MAX_FUNC_ARGS];
+    size_t numArgs = 0;
+
+    for (AST* curArg = args;
+         curArg->right != NULL;
+         curArg = curArg->right)
+    {
+        AST* arg = curArg->left;
+        arguments[numArgs++] = generateExpression(arg, symbolTable, asmWriter);
+    }
+
+    if (svCmp(svFromCStr("puti"), call->token.text) == 0) {
+        fwWriteChunkOrCrash(asmWriter, "  ; CALL PUTI\n");
+        fwWriteChunkOrCrash(asmWriter, "  mov rdi, QWORD [rsp-%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  call puti\n");
+    }
+    else if (svCmp(svFromCStr("putc"), call->token.text) == 0) {
+        fwWriteChunkOrCrash(asmWriter, "  ; CALL PUTI\n");
+        fwWriteChunkOrCrash(asmWriter, "  mov rdi, QWORD [rsp-%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  call putc\n");
+    }
+    else {
+        assert(0 && "Unimplemented");
+    }
+
+
+    return (Value) {
+        .type = {
+            .kind = TYPE_NONE,
+            .size = 0
+        },
+        .offset = 0
+    };
 }
 
 Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmWriter) {
@@ -117,6 +140,29 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
         rspOffset += 8;
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_INTEGER\n");
         fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rsp-%d], "SV_FMT"\n", rspOffset, SV_ARG(expression->token.text));
+        Value lit = (Value) {
+            .type = {
+                .kind = TYPE_I64,
+                .size = 0
+            },
+            .offset = rspOffset
+        };
+        return lit;
+    }
+    else if (expression->kind == NODE_CHAR) {
+        rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  ; NODE_CHAR\n");
+        char ch = expression->token.text.data[0];
+        if (expression->token.text.size > 1) {
+            switch (expression->token.text.data[1]) {
+                case '"': ch = '"'; break;
+                case 'n': ch = '\n'; break;
+                case 't': ch = '\t'; break;
+                case '\\': ch = '\\'; break;
+                default: assert(0);
+            }
+        }
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rsp-%d], %d\n", rspOffset, ch);
         Value lit = (Value) {
             .type = {
                 .kind = TYPE_I64,
