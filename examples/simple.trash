@@ -1,6 +1,6 @@
 
-i64 a; a = 34;
-i64 b; b = 35;
-i64 c; c = a + b;
+i64 a; a = 69;
+i64 b; b = -34;
+i64 c; c = a / b;
 puti(c);
 putc('\n');

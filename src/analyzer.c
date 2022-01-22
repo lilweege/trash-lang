@@ -61,7 +61,7 @@ TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op) {
         case NODE_LT:
         case NODE_AND:
         case NODE_OR:
-            return TYPE_U8;
+            return TYPE_I64;
         case NODE_ADD:
         case NODE_SUB:
         case NODE_MUL:
