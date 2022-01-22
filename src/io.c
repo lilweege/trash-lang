@@ -4,8 +4,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <stdarg.h>
 
-FileWriter fwCreate(char* filename) {
+FileWriter fwCreate(const char* filename) {
     return (FileWriter) {
         .fn = filename,
         .cap = WRITER_MIN_SIZE,
@@ -30,19 +31,31 @@ bool fwGrow(FileWriter* fw) {
     return true;
 }
 
-void fwWriteOrCrash(FileWriter* fw, size_t size, char* buff) {
-    while (fw->size + size >= fw->cap) {
+
+void fwWriteChunkOrCrash(FileWriter* fw, char* fmt, ...) {
+#define TMP_BUF_SZ 1024
+    static char tmpBuf[TMP_BUF_SZ];
+
+    while (fw->size + TMP_BUF_SZ >= fw->cap) {
         if (!fwGrow(fw)) {
             // return false;
             assert(0 && "Alloc failed when resizing file writer buffer");
         }
     }
-    memcpy(fw->data+fw->size, buff, size);
-    fw->size += size;
+
+    va_list args;
+    va_start(args, fmt);
+    int numBytes = vsnprintf(tmpBuf, TMP_BUF_SZ, fmt, args);
+    va_end(args);
+    assert(numBytes < TMP_BUF_SZ && "Chunk write to file to big for tmp buf (> 256 bytes)");
+
+    memcpy(fw->data+fw->size, tmpBuf, numBytes);
+    fw->size += numBytes;
     // return true;
+#undef TMP_BUF_SZ
 }
 
-void readFileOrCrash(char* filename, size_t* outSize, char** outBuff) {
+void readFileOrCrash(const char* filename, size_t* outSize, char** outBuff) {
     int res = readFile(filename, outSize, outBuff);
     if (res != 0) {
         switch (res) {
@@ -57,7 +70,7 @@ void readFileOrCrash(char* filename, size_t* outSize, char** outBuff) {
     }
 }
 
-void writeFileOrCrash(char* filename, size_t size, char* buff) {
+void writeFileOrCrash(const char* filename, size_t size, char* buff) {
     int res = writeFile(filename, size, buff);
     if (res != 0) {
         fprintf(stderr, "ERROR: Couldn't write to file '%s': %s\n", filename, strerror(errno));
@@ -72,7 +85,7 @@ void writeFileOrCrash(char* filename, size_t size, char* buff) {
 // 1 file error (errno)
 // 2 feof
 // 3 ferror
-int readFile(char* filename, size_t* outSize, char** outBuff) {
+int readFile(const char* filename, size_t* outSize, char** outBuff) {
     assert(outSize != NULL);
     assert(outBuff != NULL);
 
@@ -124,7 +137,7 @@ int readFile(char* filename, size_t* outSize, char** outBuff) {
 }
 
 
-int writeFile(char* filename, size_t size, char* buff) {
+int writeFile(const char* filename, size_t size, char* buff) {
     // open file
     FILE* fp = fopen(filename, "wb");
     if (fp == NULL) {

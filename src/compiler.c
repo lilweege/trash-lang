@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 
 #define COMPILE_MESSAGE(filename, msg, line, col, fmt, args) do { \
     fprintf(stderr, "%s:%zu:%zu: "msg": ", \

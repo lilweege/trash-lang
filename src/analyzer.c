@@ -1,5 +1,6 @@
 #include "analyzer.h"
 #include "compiler.h"
+#include "io.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -121,9 +122,28 @@ void verifyProgram(const char* filename, AST* program) {
     assert(program != NULL);
     assert(program->kind == NODE_PROGRAM);
 
+    FileWriter asmWriter = fwCreate("a.asm");
+    fwWriteChunkOrCrash(&asmWriter, "; compiler-generated statically linked Linux x86-64 NASM file\n");
+    fwWriteChunkOrCrash(&asmWriter, "; compile and link with the following command:\n");
+    fwWriteChunkOrCrash(&asmWriter, "; `nasm -felf64 -o %s %s && ld -o %s %s`\n", "a.o", "a.asm", "a.out", "a.o");
+    fwWriteChunkOrCrash(&asmWriter, "global _start\n");
+    fwWriteChunkOrCrash(&asmWriter, "section .data\n");
+    fwWriteChunkOrCrash(&asmWriter, "section .text\n");
+    fwWriteChunkOrCrash(&asmWriter, "puti:\n  mov rcx, rdi\n  sub rsp, 40\n  mov r10, rdi\n  mov r11, -3689348814741910323\n  neg rcx\n  cmovs rcx, rdi\n  mov edi, 22-1\n.puti_loop:\n  mov rax, rcx\n  movsx r9, dil\n  mul r11\n  movsx r8, r9b\n  lea edi, [r9-1]\n  mov rsi, r9\n  shr rdx, 3\n  lea rax, [rdx+rdx*4]\n  add rax, rax\n  sub rcx, rax\n  add ecx, 48\n  mov BYTE [rsp+r8], cl\n  mov rcx, rdx\n  test rdx, rdx\n  jne .puti_loop\n  test r10, r10\n  jns .puti_done\n  movsx rax, dil\n  movsx r9d, dil\n  movsx rsi, dil\n  mov BYTE [rsp+rax], 45\n.puti_done:\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea r10, [rsp+rsi]\n  mov rsi, r10\n  mov rdx, 22\n  sub edx, r9d\n  syscall\n  add rsp, 40\n  ret\n");
+    fwWriteChunkOrCrash(&asmWriter, "putc:\n  push rdi\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea rsi, [rsp]\n  mov rdx, 1\n  syscall\n  pop rax\n  ret\n");
+    fwWriteChunkOrCrash(&asmWriter, "_start:\n");
+
     HashMap symbolTable = hmNew(256);
     verifyStatements(filename, program->right, &symbolTable);
     hmFree(symbolTable);
+
+    fwWriteChunkOrCrash(&asmWriter, "  mov rax, 60\n");
+    fwWriteChunkOrCrash(&asmWriter, "  xor rdi, rdi\n");
+    fwWriteChunkOrCrash(&asmWriter, "  syscall\n");
+    fwWriteChunkOrCrash(&asmWriter, "section .bss\n");
+    // ...
+
+    fwDestroy(asmWriter);
 }
 
 void verifyStatements(const char* filename, AST* statement, HashMap* symbolTable) {
