@@ -1,7 +1,6 @@
 #ifndef IO_H
 #define IO_H
 
-#include "stringview.h"
 #include <stddef.h>
 #include <stdio.h>
 
