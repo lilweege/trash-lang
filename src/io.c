@@ -1,10 +1,46 @@
 #include "io.h"
 
-#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+
+FileWriter fwCreate(char* filename) {
+    return (FileWriter) {
+        .fn = filename,
+        .cap = WRITER_MIN_SIZE,
+        .size = 0,
+        .data = (char*) malloc(WRITER_MIN_SIZE)
+    };
+}
+
+void fwDestroy(FileWriter fw) {
+    writeFileOrCrash(fw.fn, fw.size, fw.data);
+    free(fw.data);
+}
+
+bool fwGrow(FileWriter* fw) {
+    size_t newCap = fw->cap << 1; // assume this will never overflow
+    void* newData = realloc(fw->data, newCap);
+    if (newData == NULL) {
+        return false;
+    }
+    fw->cap = newCap;
+    fw->data = newData;
+    return true;
+}
+
+void fwWriteOrCrash(FileWriter* fw, size_t size, char* buff) {
+    while (fw->size + size >= fw->cap) {
+        if (!fwGrow(fw)) {
+            // return false;
+            assert(0 && "Alloc failed when resizing file writer buffer");
+        }
+    }
+    memcpy(fw->data+fw->size, buff, size);
+    fw->size += size;
+    // return true;
+}
 
 void readFileOrCrash(char* filename, size_t* outSize, char** outBuff) {
     int res = readFile(filename, outSize, outBuff);
@@ -20,6 +56,15 @@ void readFileOrCrash(char* filename, size_t* outSize, char** outBuff) {
         exit(1);
     }
 }
+
+void writeFileOrCrash(char* filename, size_t size, char* buff) {
+    int res = writeFile(filename, size, buff);
+    if (res != 0) {
+        fprintf(stderr, "ERROR: Couldn't write to file '%s': %s\n", filename, strerror(errno));
+        exit(1);
+    }
+}
+
 
 // -2 malloc failed
 // -1 malloc too big
@@ -75,5 +120,23 @@ int readFile(char* filename, size_t* outSize, char** outBuff) {
 
     // caller is responsible for freeing this
     *outBuff = buff;
+    return 0;
+}
+
+
+int writeFile(char* filename, size_t size, char* buff) {
+    // open file
+    FILE* fp = fopen(filename, "wb");
+    if (fp == NULL) {
+        return 1;
+    }
+
+    size_t numBytes = fwrite(buff, 1, size, fp);
+
+    if (numBytes != size) {
+        return 1;
+    }
+
+    fclose(fp);
     return 0;
 }
