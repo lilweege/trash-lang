@@ -91,7 +91,7 @@ AST* parseProgram(Tokenizer* tokenizer) {
         curr->left = statement;
         curr = curr->right;
     }
-    printAST(resultTree, 0);
+    // printAST(resultTree, 0);
     return resultTree;
 }
 
