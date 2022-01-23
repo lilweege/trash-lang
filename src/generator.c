@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-size_t rspOffset = 40;
+size_t rspOffset = 0;
 
 void generateProgram(const char* filename, AST* program) {
     static char outputFilename[512];
@@ -21,12 +21,14 @@ void generateProgram(const char* filename, AST* program) {
     fwWriteChunkOrCrash(&asmWriter, "puti:\n  mov rcx, rdi\n  sub rsp, 40\n  mov r10, rdi\n  mov r11, -3689348814741910323\n  neg rcx\n  cmovs rcx, rdi\n  mov edi, 22-1\n.puti_loop:\n  mov rax, rcx\n  movsx r9, dil\n  mul r11\n  movsx r8, r9b\n  lea edi, [r9-1]\n  mov rsi, r9\n  shr rdx, 3\n  lea rax, [rdx+rdx*4]\n  add rax, rax\n  sub rcx, rax\n  add ecx, 48\n  mov BYTE [rsp+r8], cl\n  mov rcx, rdx\n  test rdx, rdx\n  jne .puti_loop\n  test r10, r10\n  jns .puti_done\n  movsx rax, dil\n  movsx r9d, dil\n  movsx rsi, dil\n  mov BYTE [rsp+rax], 45\n.puti_done:\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea r10, [rsp+rsi]\n  mov rsi, r10\n  mov rdx, 22\n  sub edx, r9d\n  syscall\n  add rsp, 40\n  ret\n");
     fwWriteChunkOrCrash(&asmWriter, "putc:\n  push rdi\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea rsi, [rsp]\n  mov rdx, 1\n  syscall\n  pop rax\n  ret\n");
     fwWriteChunkOrCrash(&asmWriter, "_start:\n");
-    // ...
+    fwWriteChunkOrCrash(&asmWriter, "  push rbp\n");
+    fwWriteChunkOrCrash(&asmWriter, "  mov rbp, rsp\n");
 
     HashMap symbolTable = hmNew(256);
     generateStatements(program->right, &symbolTable, &asmWriter);
     hmFree(symbolTable);
 
+    fwWriteChunkOrCrash(&asmWriter, "  leave\n");
     fwWriteChunkOrCrash(&asmWriter, "  mov rax, 60\n");
     fwWriteChunkOrCrash(&asmWriter, "  xor rdi, rdi\n");
     fwWriteChunkOrCrash(&asmWriter, "  syscall\n");
@@ -69,7 +71,7 @@ void generateConditional(AST* statement, HashMap* symbolTable, FileWriter* asmWr
         Value conditionResult = generateExpression(condition, symbolTable, asmWriter);
         rspOffset = stackTop;
         
-        fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rsp-%d], 0\n", conditionResult.offset);
+        fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rbp+%d], 0\n", conditionResult.offset);
         fwWriteChunkOrCrash(asmWriter, "  je .fi%d_%d\n",
                     condition->token.pos.line,
                     condition->token.pos.col);
@@ -119,7 +121,7 @@ void generateConditional(AST* statement, HashMap* symbolTable, FileWriter* asmWr
         Value conditionResult = generateExpression(condition, symbolTable, asmWriter);
         rspOffset = stackTop;
         
-        fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rsp-%d], 0\n", conditionResult.offset);
+        fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rbp+%d], 0\n", conditionResult.offset);
         fwWriteChunkOrCrash(asmWriter, "  je .done%d_%d\n",
                     condition->token.pos.line,
                     condition->token.pos.col);
@@ -148,15 +150,25 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         generateConditional(wrapper, symbolTable, asmWriter);
     }
     else if (statement->kind == NODE_DEFINITION) {
-        rspOffset += 8;
         Token id = statement->token;
+
+        int64_t arrSize = 0;
+        AST* typeNode = statement->left;
+        AST* subscript = typeNode->left;
+        bool hasSubscript = subscript != NULL;
+        if (hasSubscript) {
+            arrSize = svParseI64(subscript->token.text);
+        }
+
+        rspOffset += 8 * (arrSize == 0 ? 1 : arrSize);
+        fwWriteChunkOrCrash(asmWriter, "  ; "SV_FMT" has offset %d\n", SV_ARG(id.text), rspOffset);
         
         Symbol newVar = (Symbol) {
             .id = id.text,
             .val = {
                 .type = {
                     .kind = TYPE_I64,
-                    .size = 0
+                    .size = arrSize
                 },
                 .offset = rspOffset
             }
@@ -168,14 +180,25 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         AST* rval = statement->right;
         Token id = lval->token;
         Symbol* var = hmGet(symbolTable, id.text);
-        size_t offset = var->val.offset;
-        fwWriteChunkOrCrash(asmWriter, "  ; "SV_FMT" has offset %d\n", SV_ARG(id.text), offset);
         size_t stackTop = rspOffset;
         Value rv = generateExpression(rval, symbolTable, asmWriter);
         rspOffset = stackTop;
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", rv.offset);
-        fwWriteChunkOrCrash(asmWriter, "  mov [rsp-%d], rax\n", offset);
+        fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", rv.offset);
+        
+        fwWriteChunkOrCrash(asmWriter, "  xor rcx, rcx\n");
+        AST* subscript = lval->left;
+        bool hasSubscript = subscript != NULL;
+        if (hasSubscript) {
+            fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN subscript\n");
+            stackTop = rspOffset;
+            Value indexResult = generateExpression(subscript, symbolTable, asmWriter);
+            rspOffset = stackTop;
+            fwWriteChunkOrCrash(asmWriter, "  mov rcx, [rbp+%d]\n", indexResult.offset);
+            fwWriteChunkOrCrash(asmWriter, "  neg rcx\n");
+        }
+
+        fwWriteChunkOrCrash(asmWriter, "  mov [rbp+rcx*8+%d], rax\n", var->val.offset);
     }
     else {
         size_t stackTop = rspOffset;
@@ -201,12 +224,12 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
 
     if (svCmp(svFromCStr("puti"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; CALL PUTI\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov rdi, [rsp-%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  mov rdi, [rbp+%d]\n", arguments[0].offset);
         fwWriteChunkOrCrash(asmWriter, "  call puti\n");
     }
     else if (svCmp(svFromCStr("putc"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; CALL PUTC\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov rdi, [rsp-%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  mov rdi, [rbp+%d]\n", arguments[0].offset);
         fwWriteChunkOrCrash(asmWriter, "  call putc\n");
     }
     else {
@@ -226,7 +249,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
     if (expression->kind == NODE_INTEGER) {
         rspOffset += 8;
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_INTEGER\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rsp-%d], "SV_FMT"\n", rspOffset, SV_ARG(expression->token.text));
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp+%d], "SV_FMT"\n", rspOffset, SV_ARG(expression->token.text));
         Value lit = (Value) {
             .type = {
                 .kind = TYPE_I64,
@@ -249,7 +272,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                 default: assert(0);
             }
         }
-        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rsp-%d], %d\n", rspOffset, ch);
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp+%d], %d\n", rspOffset, ch);
         Value lit = (Value) {
             .type = {
                 .kind = TYPE_I64,
@@ -265,6 +288,27 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
     else if (expression->kind == NODE_LVALUE) {
         Token id = expression->token;
         Symbol* var = hmGet(symbolTable, id.text);
+
+        AST* subscript = expression->left;
+        bool hasSubscript = subscript != NULL;
+        if (hasSubscript) {
+            fwWriteChunkOrCrash(asmWriter, "  ; NODE_LVALUE subscript\n");
+            Value indexResult = generateExpression(subscript, symbolTable, asmWriter);
+            fwWriteChunkOrCrash(asmWriter, "  mov rcx, [rbp+%d]\n", indexResult.offset);
+            fwWriteChunkOrCrash(asmWriter, "  neg rcx\n");
+            // INDEX IN RCX
+
+            fwWriteChunkOrCrash(asmWriter, "  mov rax, QWORD [rbp+rcx*8+%d] \n", var->val.offset);
+            rspOffset += 8;
+            fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp+%d], rax\n", rspOffset);
+            return (Value) {
+                .type = {
+                    .kind = TYPE_I64,
+                    .size = 0
+                },
+                .offset = rspOffset
+            };
+        }
         return var->val;
     }
 
@@ -274,11 +318,11 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
         Value a = generateExpression(expression->left, symbolTable, asmWriter);
         switch (expression->kind) {
             case NODE_NEG: {
-                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", a.offset);
                 fwWriteChunkOrCrash(asmWriter, "  neg rax\n");
             } break;
             case NODE_NOT: {
-                fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rsp-%d], 0\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rbp+%d], 0\n", a.offset);
                 fwWriteChunkOrCrash(asmWriter, "  sete al\n");
                 fwWriteChunkOrCrash(asmWriter, "  movzx eax, al\n");
             } break;
@@ -291,22 +335,22 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
         Value b = generateExpression(expression->right, symbolTable, asmWriter);
         switch (expression->kind) {
             case NODE_ADD: {
-                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", a.offset);
-                fwWriteChunkOrCrash(asmWriter, "  add rax, [rsp-%d]\n", b.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  add rax, [rbp+%d]\n", b.offset);
             } break;
             case NODE_SUB: {
-                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", a.offset);
-                fwWriteChunkOrCrash(asmWriter, "  sub rax, [rsp-%d]\n", b.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  sub rax, [rbp+%d]\n", b.offset);
             } break;
             case NODE_MUL: {
-                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", a.offset);
-                fwWriteChunkOrCrash(asmWriter, "  imul rax, [rsp-%d]\n", b.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  imul rax, [rbp+%d]\n", b.offset);
             } break;
             case NODE_DIV:
             case NODE_MOD: {
-                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", a.offset);
                 fwWriteChunkOrCrash(asmWriter, "  cqo\n");
-                fwWriteChunkOrCrash(asmWriter, "  idiv QWORD [rsp-%d]\n", b.offset);
+                fwWriteChunkOrCrash(asmWriter, "  idiv QWORD [rbp+%d]\n", b.offset);
                 if (expression->kind == NODE_MOD) {
                     fwWriteChunkOrCrash(asmWriter, "  mov rax, rdx\n");
                 }
@@ -317,8 +361,8 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
             case NODE_LT:
             case NODE_GE:
             case NODE_LE: {
-                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", a.offset);
-                fwWriteChunkOrCrash(asmWriter, "  cmp rax, [rsp-%d]\n", b.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  cmp rax, [rbp+%d]\n", b.offset);
                 switch (expression->kind) {
                     case NODE_NE: fwWriteChunkOrCrash(asmWriter, "  setne al\n"); break;
                     case NODE_EQ: fwWriteChunkOrCrash(asmWriter, "  sete al\n"); break;
@@ -331,17 +375,17 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                 fwWriteChunkOrCrash(asmWriter, "  movzx eax, al\n");
             } break;
             case NODE_AND: {
-                fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rsp-%d], 0\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rbp+%d], 0\n", a.offset);
                 fwWriteChunkOrCrash(asmWriter, "  setne al\n");
                 fwWriteChunkOrCrash(asmWriter, "  xor edi, edi\n");
-                fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rsp-%d], 0\n", b.offset);
+                fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rbp+%d], 0\n", b.offset);
                 fwWriteChunkOrCrash(asmWriter, "  setne dil\n");
                 fwWriteChunkOrCrash(asmWriter, "  and rax, rdi\n");
             } break;
             case NODE_OR: {
-                fwWriteChunkOrCrash(asmWriter, "  mov rax, QWORD [rsp-%d]\n", a.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, QWORD [rbp+%d]\n", a.offset);
                 fwWriteChunkOrCrash(asmWriter, "  xor edi, edi\n");
-                fwWriteChunkOrCrash(asmWriter, "  or rax, QWORD [rsp-%d]\n", b.offset);
+                fwWriteChunkOrCrash(asmWriter, "  or rax, QWORD [rbp+%d]\n", b.offset);
                 fwWriteChunkOrCrash(asmWriter, "  setne al\n");
                 fwWriteChunkOrCrash(asmWriter, "  movzx eax, al\n");
             } break;
@@ -351,7 +395,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
     }
 
     rspOffset += 8;
-    fwWriteChunkOrCrash(asmWriter, "  mov [rsp-%d], rax\n", rspOffset);
+    fwWriteChunkOrCrash(asmWriter, "  mov [rbp+%d], rax\n", rspOffset);
     return (Value) {
         .type = {
             .kind = TYPE_I64,
