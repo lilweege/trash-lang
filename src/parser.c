@@ -6,7 +6,7 @@
 #include <assert.h>
 
 const char* nodeKindName(NodeKind kind) {
-    _Static_assert(NODE_COUNT == 31, "Exhaustive check of node kinds failed");
+    static_assert(NODE_COUNT == 31, "Exhaustive check of node kinds failed");
     const char* NodeKindNames[31] = {
         "NODE_PROGRAM",
         "NODE_IF",

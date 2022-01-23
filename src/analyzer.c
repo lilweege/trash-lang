@@ -42,7 +42,7 @@ TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op) {
     // additionally, it depends on the order of the TypeKind enum in conjunction with the fact that 
     // according to my upcasting rules, the max of both type enums is the type to cast to
     // this will almost definitely break when more types are introduced
-    _Static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
+    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
 
     if (type1 < type2) {
         TypeKind t = type1;
@@ -94,7 +94,7 @@ TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op) {
 
 
 const char* typeKindName(TypeKind type) {
-    _Static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
+    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
     const char* TypeKindNames[5] = {
         "TYPE_NONE",
         "TYPE_STR",
@@ -106,7 +106,7 @@ const char* typeKindName(TypeKind type) {
 }
 
 const char* typeKindKeyword(TypeKind type) {
-    _Static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
+    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
     const char* TypeKindKeywords[5] = {
         "void",
         "str",

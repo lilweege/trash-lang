@@ -8,7 +8,7 @@
 #include <stdarg.h>
 
 const char* tokenKindName(TokenKind kind) {
-    _Static_assert(TOKEN_COUNT == 33, "Exhaustive check of token kinds failed");
+    static_assert(TOKEN_COUNT == 33, "Exhaustive check of token kinds failed");
     const char* TokenKindNames[33] = {
         "TOKEN_NONE",
         "TOKEN_SEMICOLON",

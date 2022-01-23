@@ -26,7 +26,7 @@ void stackPop(size_t restoreIdx) {
 }
 
 size_t typeKindSize(TypeKind kind) {
-    _Static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
+    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
     switch (kind) {
         case TYPE_NONE: return 0; // ??
         // str handled specially, characters go directly on stack
@@ -53,7 +53,7 @@ uint8_t* valueAddr(Value val) {
         case TYPE_I64: lvalue = (cast_type) CAST_VALUE_RAW(int64_t, value); break; \
         case TYPE_U8: lvalue = (cast_type) CAST_VALUE_RAW(uint8_t, value); break; \
         case TYPE_F64: lvalue = (cast_type) CAST_VALUE_RAW(double, value); break; \
-        default: assert(0); \
+        default: lvalue = 0; assert(0); \
     } \
 } while (0)
 
@@ -226,7 +226,7 @@ Value evaluateCall(AST* call, HashMap* symbolTable) {
     }
 
     if (svCmp(svFromCStr("puti"), call->token.text) == 0) {
-        printf("%ld", CAST_VALUE_RAW(int64_t, arguments[0]));
+        printf("%lld", (long long) CAST_VALUE_RAW(int64_t, arguments[0]));
     }
     else if (svCmp(svFromCStr("putf"), call->token.text) == 0) {
         printf("%f", CAST_VALUE_RAW(double, arguments[0]));
@@ -394,7 +394,7 @@ Value evaluateExpression(AST* expression, HashMap* symbolTable) {
             BIND_CAST_VALUE(lOpRes, lType, lOperand); \
             rType rOpRes; \
             BIND_CAST_VALUE(rOpRes, rType, rOperand); \
-            CAST_VALUE_RAW(lType, result) = lOpRes binaryOp rOpRes; \
+            CAST_VALUE_RAW(lType, result) = (lType) (lOpRes binaryOp rOpRes); \
         } break;
 
 #define BINARY_LOP_SWITCH_CASE_REAL(lOperandKind, lType, binaryOp) \
@@ -448,13 +448,5 @@ Value evaluateExpression(AST* expression, HashMap* symbolTable) {
         // printf("%d\n", CAST_VALUE(uint8_t, result));
         return result;
     }
-
     // unreachable
-    return (Value) {
-        .type = {
-            .kind = TYPE_NONE,
-            .size = 0
-        },
-        .offset = 0
-    };
 }

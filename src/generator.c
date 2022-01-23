@@ -6,8 +6,8 @@
 size_t rspOffset = 40;
 
 void generateProgram(const char* filename, AST* program) {
+    static char outputFilename[512];
     size_t fnLen = strlen(filename);
-    char outputFilename[fnLen+5];
     memcpy(outputFilename, filename, fnLen);
     memcpy(outputFilename+fnLen, ".asm", 5);
     FileWriter asmWriter = fwCreate(outputFilename);
