@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-size_t rspOffset = 0;
+size_t rspOffset = 40;
 
 void generateProgram(const char* filename, AST* program) {
     size_t fnLen = strlen(filename);
@@ -44,8 +44,7 @@ void generateStatements(AST* statement, HashMap* symbolTable, FileWriter* asmWri
     AST* toCheck = statement->left;
     AST* nextStatement = statement->right;
     if (toCheck->kind == NODE_WHILE || toCheck->kind == NODE_IF) {
-        // verifyConditional(statement, symbolTable, asmWriter);
-        assert(0 && "conditional generation not implemented yet");
+        generateConditional(statement, symbolTable, asmWriter);
     }
     else {
         generateStatement(statement, symbolTable, asmWriter);
@@ -53,11 +52,100 @@ void generateStatements(AST* statement, HashMap* symbolTable, FileWriter* asmWri
     generateStatements(nextStatement, symbolTable, asmWriter);
 }
 
+void generateConditional(AST* statement, HashMap* symbolTable, FileWriter* asmWriter) {
+    AST* conditional = statement->left;
+    
+    AST* condition = conditional->left;
+    if (conditional->kind == NODE_IF) {
+        AST* left = conditional->left;
+        bool hasElse = left->kind == NODE_ELSE; // left is `else`
+        if (hasElse) {
+            condition = left->left;
+        }
+
+        fwWriteChunkOrCrash(asmWriter, "  ; NODE_IF\n");
+
+        size_t stackTop = rspOffset;
+        Value conditionResult = generateExpression(condition, symbolTable, asmWriter);
+        rspOffset = stackTop;
+        
+        fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rsp-%d], 0\n", conditionResult.offset);
+        fwWriteChunkOrCrash(asmWriter, "  je .fi%d_%d\n",
+                    condition->token.pos.line,
+                    condition->token.pos.col);
+
+        AST* ifBody = conditional->right;
+        if (ifBody->kind == NODE_BLOCK) {
+            AST* first = ifBody->right;
+            generateStatements(first, symbolTable, asmWriter);
+        }
+        else {
+            generateStatement(ifBody, symbolTable, asmWriter);
+        }
+
+        if (hasElse) {
+            fwWriteChunkOrCrash(asmWriter, "  ; NODE_ELSE\n");
+            fwWriteChunkOrCrash(asmWriter, "  jmp .done%d_%d\n",
+                    condition->token.pos.line,
+                    condition->token.pos.col);
+        }
+        fwWriteChunkOrCrash(asmWriter, ".fi%d_%d:\n",
+                    condition->token.pos.line,
+                    condition->token.pos.col);
+
+        if (hasElse) {
+            AST* elseBody = left->right;
+            if (elseBody->kind == NODE_BLOCK) {
+                AST* first = elseBody->right;
+                generateStatements(first, symbolTable, asmWriter);
+            }
+            else {
+                generateStatement(elseBody, symbolTable, asmWriter);
+            }
+            fwWriteChunkOrCrash(asmWriter, ".done%d_%d:\n",
+                        condition->token.pos.line,
+                        condition->token.pos.col);
+        }
+
+    }
+    else {
+        fwWriteChunkOrCrash(asmWriter, "  ; NODE_WHILE\n");
+        fwWriteChunkOrCrash(asmWriter, ".loop%d_%d:\n",
+                    condition->token.pos.line,
+                    condition->token.pos.col);
+
+
+        size_t stackTop = rspOffset;
+        Value conditionResult = generateExpression(condition, symbolTable, asmWriter);
+        rspOffset = stackTop;
+        
+        fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rsp-%d], 0\n", conditionResult.offset);
+        fwWriteChunkOrCrash(asmWriter, "  je .done%d_%d\n",
+                    condition->token.pos.line,
+                    condition->token.pos.col);
+    
+        AST* body = conditional->right;
+        if (body->kind == NODE_BLOCK) {
+            AST* first = body->right;
+            generateStatements(first, symbolTable, asmWriter);
+        }
+        else {
+            generateStatement(body, symbolTable, asmWriter);
+        }
+
+        fwWriteChunkOrCrash(asmWriter, "  jmp .loop%d_%d\n",
+                    condition->token.pos.line,
+                    condition->token.pos.col);
+        fwWriteChunkOrCrash(asmWriter, ".done%d_%d:\n",
+                    condition->token.pos.line,
+                    condition->token.pos.col);
+    }
+}
+
 void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter) {
     AST* statement = wrapper->left;
     if (statement->kind == NODE_WHILE || statement->kind == NODE_IF) {
-        // verifyConditional(wrapper, symbolTable, asmWriter);
-        assert(0 && "conditional generation not implemented yet");
+        generateConditional(wrapper, symbolTable, asmWriter);
     }
     else if (statement->kind == NODE_DEFINITION) {
         rspOffset += 8;
@@ -83,15 +171,16 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         size_t offset = var->val.offset;
         fwWriteChunkOrCrash(asmWriter, "  ; "SV_FMT" has offset %d\n", SV_ARG(id.text), offset);
         size_t stackTop = rspOffset;
-        generateExpression(rval, symbolTable, asmWriter);
-        size_t tmpAddr = rspOffset;
+        Value rv = generateExpression(rval, symbolTable, asmWriter);
         rspOffset = stackTop;
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", tmpAddr);
+        fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", rv.offset);
         fwWriteChunkOrCrash(asmWriter, "  mov [rsp-%d], rax\n", offset);
     }
     else {
+        size_t stackTop = rspOffset;
         generateExpression(statement, symbolTable, asmWriter);
+        rspOffset = stackTop;
     }
 }
 
@@ -105,7 +194,9 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
          curArg = curArg->right)
     {
         AST* arg = curArg->left;
+        size_t stackTop = rspOffset;
         arguments[numArgs++] = generateExpression(arg, symbolTable, asmWriter);
+        rspOffset = stackTop;
     }
 
     if (svCmp(svFromCStr("puti"), call->token.text) == 0) {
@@ -132,10 +223,6 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
 }
 
 Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmWriter) {
-    (void) expression;
-    (void) symbolTable;
-    (void) asmWriter;
-
     if (expression->kind == NODE_INTEGER) {
         rspOffset += 8;
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_INTEGER\n");
@@ -193,6 +280,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
             case NODE_NOT: {
                 fwWriteChunkOrCrash(asmWriter, "  cmp QWORD [rsp-%d], 0\n", a.offset);
                 fwWriteChunkOrCrash(asmWriter, "  sete al\n");
+                fwWriteChunkOrCrash(asmWriter, "  movzx eax, al\n");
             } break;
             default: assert(0);
         }
@@ -223,6 +311,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                     fwWriteChunkOrCrash(asmWriter, "  mov rax, rdx\n");
                 }
             } break;
+            case NODE_NE:
             case NODE_EQ:
             case NODE_GT:
             case NODE_LT:
@@ -231,6 +320,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                 fwWriteChunkOrCrash(asmWriter, "  mov rax, [rsp-%d]\n", a.offset);
                 fwWriteChunkOrCrash(asmWriter, "  cmp rax, [rsp-%d]\n", b.offset);
                 switch (expression->kind) {
+                    case NODE_NE: fwWriteChunkOrCrash(asmWriter, "  setne al\n"); break;
                     case NODE_EQ: fwWriteChunkOrCrash(asmWriter, "  sete al\n"); break;
                     case NODE_GT: fwWriteChunkOrCrash(asmWriter, "  setg al\n"); break;
                     case NODE_LT: fwWriteChunkOrCrash(asmWriter, "  setl al\n"); break;
