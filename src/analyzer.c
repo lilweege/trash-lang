@@ -17,40 +17,33 @@ bool isScalar(Type type) {
 }
 
 
-TypeKind unaryResultTypeKind(TypeKind type, NodeKind op) {
-    if (type == TYPE_NONE || type == TYPE_STR) {
+TypeKind unaryResultTypeKind(TypeKind kind, NodeKind op) {
+    if (kind == TYPE_NONE || kind == TYPE_STR) {
         return TYPE_NONE;
     }
     switch (op) {
         case NODE_NEG: // NOTE: neg unsigned is allowed
+            return kind;
         case NODE_NOT:
-            return type;
+            return TYPE_I64;
         default: break;
     }
     return TYPE_NONE; // unsupported
 }
 
-TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op) {
-    if (type1 == TYPE_NONE || type2 == TYPE_NONE ||
-        type1 == TYPE_STR || type2 == TYPE_STR) {
+TypeKind binaryResultTypeKind(TypeKind kind1, TypeKind kind2, NodeKind op) {
+    if (kind1 == TYPE_NONE || kind2 == TYPE_NONE ||
+        kind1 == TYPE_STR || kind2 == TYPE_STR) {
         // cannot operate on none type (void) or string literal
         return TYPE_NONE;
     }
 
-    // this is a nasty trick which greatly reduces the combinatorial explosion in simulator.c (yay macros)
-    // of course all binary operations must be commutative
-    // additionally, it depends on the order of the TypeKind enum in conjunction with the fact that 
-    // according to my upcasting rules, the max of both type enums is the type to cast to
-    // this will almost definitely break when more types are introduced
-    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
-
-    if (type1 < type2) {
-        TypeKind t = type1;
-        type1 = type2;
-        type2 = t;
+    if (kind1 != kind2) {
+        // ensure same type
+        return TYPE_NONE;
     }
-    assert(type1 >= type2);
 
+    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
 
     switch (op) {
         case NODE_EQ:
@@ -65,28 +58,12 @@ TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op) {
         case NODE_ADD:
         case NODE_SUB:
         case NODE_MUL:
-        case NODE_DIV: {
-            return type1; // NASTY TRICK...
-
-            // if (type1 == TYPE_F64 || type2 == TYPE_F64)
-            //     return TYPE_F64;
-            // if (type1 == TYPE_I64 || type2 == TYPE_I64)
-            //     return TYPE_I64;
-            // if (type1 == TYPE_U8 || type2 == TYPE_U8)
-            //     return TYPE_U8;
-            // return TYPE_NONE; // probably unreachable
-        }
-        case NODE_MOD: {
-            if (type1 == TYPE_F64 || type2 == TYPE_F64)
+        case NODE_DIV:
+            return kind1;
+        case NODE_MOD:
+            if (kind1 == TYPE_F64)
                 return TYPE_NONE;
-
-            return type1;
-            // if (type1 == TYPE_I64 || type2 == TYPE_I64)
-            //     return TYPE_I64;
-            // if (type1 == TYPE_U8 || type2 == TYPE_U8)
-            //     return TYPE_U8;
-            // return TYPE_NONE; // probably unreachable
-        }
+            return kind1;
         default: break;
     }
     return TYPE_NONE; // unsupported
@@ -362,6 +339,37 @@ Type checkCall(const char* filename, AST* call, HashMap* symbolTable) {
         }
         return (Type) { .kind = TYPE_NONE, .size = 0 };
     }
+
+    // type casting
+    if (svCmp(svFromCStr("itof"), call->token.text) == 0) {
+        expectNumArgs(1);
+        if (!argMatch(0, TYPE_I64, true)) {
+            positionalArgFail(0, TYPE_I64, true);
+        }
+        return (Type) { .kind = TYPE_F64, .size = 0 };
+    }
+    if (svCmp(svFromCStr("ftoi"), call->token.text) == 0) {
+        expectNumArgs(1);
+        if (!argMatch(0, TYPE_F64, true)) {
+            positionalArgFail(0, TYPE_F64, true);
+        }
+        return (Type) { .kind = TYPE_I64, .size = 0 };
+    }
+    if (svCmp(svFromCStr("itoc"), call->token.text) == 0) {
+        expectNumArgs(1);
+        if (!argMatch(0, TYPE_I64, true)) {
+            positionalArgFail(0, TYPE_I64, true);
+        }
+        return (Type) { .kind = TYPE_U8, .size = 0 };
+    }
+    if (svCmp(svFromCStr("ctoi"), call->token.text) == 0) {
+        expectNumArgs(1);
+        if (!argMatch(0, TYPE_U8, true)) {
+            positionalArgFail(0, TYPE_U8, true);
+        }
+        return (Type) { .kind = TYPE_I64, .size = 0 };
+    }
+    
     
     // TODO: type cast functions
     // TODO: user defined subroutines

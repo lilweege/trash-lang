@@ -237,19 +237,55 @@ Value evaluateCall(AST* call, HashMap* symbolTable) {
     else if (svCmp(svFromCStr("puts"), call->token.text) == 0) {
         printf("%s", valueAddr(arguments[0]));
     }
+    else if (svCmp(svFromCStr("itof"), call->token.text) == 0) {
+        Value ret = (Value) {
+            .type = {
+                .kind = TYPE_F64,
+                .size = 0
+            },
+            .offset = stackPush(typeKindSize(TYPE_F64))
+        };
+        CAST_VALUE_RAW(double, ret) = (double) CAST_VALUE_RAW(int64_t, arguments[0]);
+        return ret;
+    }
+    else if (svCmp(svFromCStr("ftoi"), call->token.text) == 0) {
+        Value ret = (Value) {
+            .type = {
+                .kind = TYPE_I64,
+                .size = 0
+            },
+            .offset = stackPush(typeKindSize(TYPE_I64))
+        };
+        CAST_VALUE_RAW(int64_t, ret) = (int64_t) CAST_VALUE_RAW(double, arguments[0]);
+        return ret;
+    }
+    else if (svCmp(svFromCStr("itoc"), call->token.text) == 0) {
+        Value ret = (Value) {
+            .type = {
+                .kind = TYPE_I64,
+                .size = 0
+            },
+            .offset = stackPush(typeKindSize(TYPE_I64))
+        };
+        CAST_VALUE_RAW(uint8_t, ret) = (uint8_t) CAST_VALUE_RAW(int64_t, arguments[0]);
+        return ret;
+    }
+    else if (svCmp(svFromCStr("ctoi"), call->token.text) == 0) {
+        Value ret = (Value) {
+            .type = {
+                .kind = TYPE_U8,
+                .size = 0
+            },
+            .offset = stackPush(typeKindSize(TYPE_U8))
+        };
+        CAST_VALUE_RAW(int64_t, ret) = (int64_t) CAST_VALUE_RAW(uint8_t, arguments[0]);
+        return ret;
+    }
     else {
         assert(0 && "Unimplemented");
     }
-
-    // TODO:
-    (void) symbolTable;
-    (void) call;
-    // printf("CALL: "SV_FMT"\n", SV_ARG(call->token.text));
-    // Symbol* var = hmGet(symbolTable, call->left->left->token.text);
-    // printf(SV_FMT" = %ld\n",
-    // printf("%ld\n",
-    //         // SV_ARG(call->left->left->token.text),
-    //         CAST_VALUE(int64_t, var->val));
+    
+    // unreachable
     return (Value) {
         .type = {
             .kind = TYPE_NONE,
