@@ -3,8 +3,8 @@
 ? a deliberately simple proof of concept
 
 i64 SIZE; SIZE = 20;
-i64[SIZE] prvRow;
-i64[SIZE] curRow;
+i64[20] prvRow;
+i64[20] curRow;
 
 ? initialize memory
 i64 i; i = 0;

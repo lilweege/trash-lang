@@ -197,6 +197,13 @@ void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
         bool hasSubscript = subscript != NULL;
         if (hasSubscript) {
             // defining an array
+
+            // TODO: compile time evaluations of contants ?
+            if (subscript->kind != NODE_INTEGER) {
+                compileError((FileInfo) { filename, subscript->token.pos },
+                             "Array size must be constant");
+            }
+
             Type sizeExpr = checkExpression(filename, subscript, symbolTable);
             if (!isScalar(sizeExpr) || !isIntegral(sizeExpr.kind)) {
                 compileError((FileInfo) { filename, subscript->token.pos },
