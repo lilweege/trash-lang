@@ -16,7 +16,7 @@ Any of the following are viable options for building the project:
 
 ```console
 > make
-> .\bin\trash.exe examples\hello1.trash
+> .\bin\trash.exe -r examples\hello1.trash
 ```
 
 #### Posix
@@ -27,5 +27,5 @@ I have not tested this on a mac, so please let me know if you try. It should wor
 
 ```console
 $ make
-$ ./bin/trash examples/hello1.trash
+$ ./bin/trash -r examples/hello1.trash
 ```
