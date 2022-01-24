@@ -232,8 +232,69 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
         fwWriteChunkOrCrash(asmWriter, "  mov rdi, [rbp+%d]\n", arguments[0].offset);
         fwWriteChunkOrCrash(asmWriter, "  call putc\n");
     }
+    else if (svCmp(svFromCStr("putf"), call->token.text) == 0) {
+        fwWriteChunkOrCrash(asmWriter, "  ; CALL PUTF\n");
+        fwWriteChunkOrCrash(asmWriter, "  mov rdi, 63\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  call putc\n");
+
+        // TODO:
+
+    }
+    else if (svCmp(svFromCStr("itof"), call->token.text) == 0) {
+        fwWriteChunkOrCrash(asmWriter, "  ; ITOF\n");
+        rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  cvtsi2sd xmm0, QWORD [rbp+%d]\n", arguments[0].offset); // nice instruction
+        fwWriteChunkOrCrash(asmWriter, "  movq QWORD [rbp+%d], xmm0\n", rspOffset);
+        return (Value) {
+            .type = {
+                .kind = TYPE_F64,
+                .size = 0
+            },
+            .offset = rspOffset
+        };
+    }
+    else if (svCmp(svFromCStr("ftoi"), call->token.text) == 0) {
+        fwWriteChunkOrCrash(asmWriter, "  ; FTOI\n");
+        rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  cvttsd2si rax, QWORD [rbp+%d]\n", arguments[0].offset); // nice instruction
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp+%d], rax\n", rspOffset);
+        return (Value) {
+            .type = {
+                .kind = TYPE_I64,
+                .size = 0
+            },
+            .offset = rspOffset
+        };
+    }
+    else if (svCmp(svFromCStr("itoc"), call->token.text) == 0) {
+        fwWriteChunkOrCrash(asmWriter, "  ; ITOC\n");
+        rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  mov al, BYTE [rbp+%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp+%d], rax\n", rspOffset);
+        return (Value) {
+            .type = {
+                .kind = TYPE_U8,
+                .size = 0
+            },
+            .offset = rspOffset
+        };
+    }
+    else if (svCmp(svFromCStr("ctoi"), call->token.text) == 0) {
+        fwWriteChunkOrCrash(asmWriter, "  ; CTOI\n");
+        rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  movzx rax, BYTE [rbp+%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp+%d], rax\n", rspOffset);
+        return (Value) {
+            .type = {
+                .kind = TYPE_I64,
+                .size = 0
+            },
+            .offset = rspOffset
+        };
+    }
     else {
-        assert(0 && "Unimplemented");
+        printf(SV_FMT" UNIMPLEMENTED\n", SV_ARG(call->token.text));
+        assert(0 );
     }
 
     return (Value) {
@@ -258,6 +319,21 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
             .offset = rspOffset
         };
         return lit;
+    }
+    else if (expression->kind == NODE_FLOAT) {
+        rspOffset += 8;
+        double literal = svParseF64(expression->token.text);
+        fwWriteChunkOrCrash(asmWriter, "  ; NODE_FLOAT\n");
+        fwWriteChunkOrCrash(asmWriter, "  mov rax, 0x%lX ; %.16f\n", *(int64_t*)(&literal), literal);
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp+%d], rax\n", rspOffset);
+
+        return (Value) {
+            .type = {
+                .kind = TYPE_F64,
+                .size = 0
+            },
+            .offset = rspOffset
+        };
     }
     else if (expression->kind == NODE_CHAR) {
         rspOffset += 8;
