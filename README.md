@@ -10,7 +10,7 @@ NOTE: This is very much an unfinished work in progess (as evident by the mess of
   - [ ] x86_64 Windows NASM
 - [x] Statically typed
   - [x] Integer arithmetic
-  - [ ] Floating-point arithmetic
+  - [x] Floating-point arithmetic
   - [ ] Strings
 - [x] Loops (`while`)
 - [x] Conditionals (`if`/`else`)

@@ -249,8 +249,10 @@ void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
         if (lvalType.kind != rvalType.kind) {
             // mismatched types
             compileError((FileInfo) { filename, lval->token.pos },
-                         "Cannot assign \""SV_FMT"\" due to mismatched types",
-                         SV_ARG(lval->token.text));
+                         "Cannot assign expression of type %s to \""SV_FMT"\" (%s)",
+                         typeKindKeyword(rvalType.kind),
+                         SV_ARG(lval->token.text),
+                         typeKindKeyword(lvalType.kind));
         }
         // assignment ok
     }
