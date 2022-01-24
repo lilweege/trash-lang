@@ -18,6 +18,7 @@ void generateProgram(const char* filename, AST* program) {
     fwWriteChunkOrCrash(&asmWriter, "global _start\n");
     fwWriteChunkOrCrash(&asmWriter, "section .data\n");
     fwWriteChunkOrCrash(&asmWriter, "section .text\n");
+    fwWriteChunkOrCrash(&asmWriter, "putf:\n  push rbp\n  cvttsd2si rbp, xmm0\n  push rbx\n  mov rbx, rdi\n  sub rsp, 72\n  mov rdi, rbp\n  movsd QWORD [rsp+8], xmm0\n  call puti\n  movsd xmm0, QWORD [rsp+8]\n  pxor xmm1, xmm1\n  comisd xmm1, xmm0\n  jbe .putf_pos\n  mov r8, 0x8000000000000000\n  mov QWORD [rsp], r8\n  movsd xmm1, QWORD [rsp]\n  xorpd xmm0, xmm1\n  cvttsd2si rbp, xmm0\n.putf_pos:\n  pxor xmm1, xmm1\n  mov BYTE [rsp+16], 46\n  cvtsi2sd xmm1, rbp\n  subsd xmm0, xmm1\n  test rbx, rbx\n  je .putf_single\n  lea rax, [rsp+17]\n  mov r8, 0x4024000000000000\n  mov QWORD [rsp], r8\n  movsd xmm2, QWORD [rsp]\n  lea rdi, [rax+rbx]\n.putf_loop:\n  mulsd xmm0, xmm2\n  pxor xmm1, xmm1\n  add rax, 1\n  cvttsd2si rdx, xmm0\n  cvtsi2sd xmm1, rdx\n  lea ecx, [rdx+48]\n  mov BYTE [rax-1], cl\n  subsd xmm0, xmm1\n  cmp rdi, rax\n  jne .putf_loop\n  lea rdx, [rbx+1]\n.putf_done:\n  lea rsi, [rsp+16]\n  mov rax, 1\n  mov rdi, 1\n  syscall\n  add rsp, 72\n  pop rbx\n  pop rbp\n  ret\n.putf_single:\n  mov edx, 1\n  jmp .putf_done\n");
     fwWriteChunkOrCrash(&asmWriter, "puti:\n  mov rcx, rdi\n  sub rsp, 40\n  mov r10, rdi\n  mov r11, -3689348814741910323\n  neg rcx\n  cmovs rcx, rdi\n  mov edi, 22-1\n.puti_loop:\n  mov rax, rcx\n  movsx r9, dil\n  mul r11\n  movsx r8, r9b\n  lea edi, [r9-1]\n  mov rsi, r9\n  shr rdx, 3\n  lea rax, [rdx+rdx*4]\n  add rax, rax\n  sub rcx, rax\n  add ecx, 48\n  mov BYTE [rsp+r8], cl\n  mov rcx, rdx\n  test rdx, rdx\n  jne .puti_loop\n  test r10, r10\n  jns .puti_done\n  movsx rax, dil\n  movsx r9d, dil\n  movsx rsi, dil\n  mov BYTE [rsp+rax], 45\n.puti_done:\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea r10, [rsp+rsi]\n  mov rsi, r10\n  mov rdx, 22\n  sub edx, r9d\n  syscall\n  add rsp, 40\n  ret\n");
     fwWriteChunkOrCrash(&asmWriter, "putc:\n  push rdi\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea rsi, [rsp]\n  mov rdx, 1\n  syscall\n  pop rax\n  ret\n");
     fwWriteChunkOrCrash(&asmWriter, "_start:\n");
@@ -233,12 +234,11 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
         fwWriteChunkOrCrash(asmWriter, "  call putc\n");
     }
     else if (svCmp(svFromCStr("putf"), call->token.text) == 0) {
+        const size_t precision = 8; // TODO: make this a (optional) parameter
         fwWriteChunkOrCrash(asmWriter, "  ; CALL PUTF\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov rdi, 63\n", arguments[0].offset);
-        fwWriteChunkOrCrash(asmWriter, "  call putc\n");
-
-        // TODO:
-
+        fwWriteChunkOrCrash(asmWriter, "  movsd xmm0, QWORD [rbp+%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  mov rdi, %zu\n", precision);
+        fwWriteChunkOrCrash(asmWriter, "  call putf\n");
     }
     else if (svCmp(svFromCStr("itof"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; ITOF\n");
