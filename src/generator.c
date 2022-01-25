@@ -329,8 +329,10 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
     else if (expression->kind == NODE_FLOAT) {
         rspOffset += 8;
         double literal = svParseF64(expression->token.text);
+        int64_t double_raw;
+        memcpy(&double_raw, &literal, 8);
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_FLOAT\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov rax, 0x%lX ; %.16f\n", *(int64_t*)(&literal), literal);
+        fwWriteChunkOrCrash(asmWriter, "  mov rax, 0x%lX ; %.16f\n", double_raw, literal);
         fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp+%d], rax\n", rspOffset);
 
         return (Value) {
