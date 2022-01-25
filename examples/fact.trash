@@ -1,0 +1,10 @@
+
+i64 fact; fact = 1;
+i64 i; i = 1;
+
+while (i <= 20) {
+    fact = fact * i;
+    puti(fact);
+    putc('\n');
+    i = i + 1;
+}
