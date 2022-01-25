@@ -5,15 +5,9 @@
 
 size_t rspOffset = 0;
 
-void generateProgram(const char* filename, AST* program) {
-    static char outputFilename[512];
-    size_t fnLen = strlen(filename);
-    memcpy(outputFilename, filename, fnLen);
-    memcpy(outputFilename+fnLen, ".asm", 5);
+void generateProgram(const char* outputFilename, AST* program) {
     FileWriter asmWriter = fwCreate(outputFilename);
-    fwWriteChunkOrCrash(&asmWriter, "; compiler-generated statically linked Linux x86-64 NASM file\n");
-    fwWriteChunkOrCrash(&asmWriter, "; compile and link with the following command:\n");
-    fwWriteChunkOrCrash(&asmWriter, "; `nasm -felf64 -o %s.o %s.asm && ld -o %s %s.o`\n", filename, filename, filename, filename);
+    fwWriteChunkOrCrash(&asmWriter, "; compiler-generated Linux x86-64 NASM file\n");
     fwWriteChunkOrCrash(&asmWriter, "BITS 64\n");
     fwWriteChunkOrCrash(&asmWriter, "global _start\n");
     fwWriteChunkOrCrash(&asmWriter, "section .data\n");

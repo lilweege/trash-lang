@@ -24,6 +24,7 @@ StringView svLeftChop(StringView* sv, size_t n);
 StringView svLeftChopWhile(StringView* sv, bool (*predicate)(char c));
 StringView svSubstring(StringView sv, size_t beginIdx, size_t endIdx);
 bool svFirstIndexOfChar(StringView sv, char c, size_t* outIdx);
+bool svLastIndexOfChar(StringView sv, char c, size_t* outIdx);
 bool svFirstIndexOf(StringView src, StringView str, size_t* outIdx);
 int svCmp(StringView a, StringView b);
 char svPeek(StringView sv, size_t n);

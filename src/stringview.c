@@ -79,6 +79,18 @@ bool svFirstIndexOfChar(StringView sv, char c, size_t* outIdx) {
     return false;
 }
 
+bool svLastIndexOfChar(StringView sv, char c, size_t* outIdx) {
+    for (size_t i = sv.size-1; i+1 >= 1; --i) {
+        if (sv.data[i] == c) {
+            if (outIdx != NULL) {
+                *outIdx = i;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 bool svFirstIndexOf(StringView src, StringView str, size_t* outIdx) {
     if (str.size > src.size) {
         return -1;

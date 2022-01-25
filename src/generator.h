@@ -5,7 +5,7 @@
 #include "hashmap.h"
 #include "io.h"
 
-void generateProgram(const char* filename, AST* program);
+void generateProgram(const char* outputFilename, AST* program);
 
 void generateStatements(AST* statement, HashMap* symbolTable, FileWriter* asmWriter);
 void generateConditional(AST* statement, HashMap* symbolTable, FileWriter* asmWriter);
