@@ -73,6 +73,7 @@ bool pollToken(Tokenizer* tokenizer) {
         if (curChar == '?') {
             size_t commentEnd = 0;
             if (!svFirstIndexOfChar(tokenizer->source, '\n', &commentEnd)) {
+                svLeftChop(&tokenizer->source, tokenizer->source.size);
                 break;
             }
             svLeftChop(&tokenizer->source, commentEnd);
