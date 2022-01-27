@@ -177,7 +177,11 @@ void compileFile(char* filename) {
 
     // assemble and link
     const int basenameLen = pathnameLen - pathEndIdx;
-    snprintf(cmdBuf, TMP_BUF_SZ, "nasm -felf64 -o %.*s.o %.*s.asm",
+    snprintf(cmdBuf, TMP_BUF_SZ, "nasm -felf64"
+#ifdef DEBUG
+             " -g -wall"
+#endif // DEBUG
+             " -o %.*s.o %.*s.asm",
              basenameLen, asmFilename,
              basenameLen, asmFilename);
     printf("EXEC: ");
