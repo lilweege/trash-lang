@@ -25,23 +25,6 @@ void stackPop(size_t restoreIdx) {
     stackTop = restoreIdx;
 }
 
-size_t typeKindSize(TypeKind kind) {
-    static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
-    switch (kind) {
-        case TYPE_NONE: return 0; // ??
-        // str handled specially, characters go directly on stack
-        case TYPE_STR: return sizeof(uint8_t);
-        case TYPE_U8: return sizeof(uint8_t);
-        case TYPE_I64: return sizeof(int64_t);
-        case TYPE_F64: return sizeof(double);
-        default: return 0;
-    }
-}
-
-size_t typeSize(Type type) {
-    return typeKindSize(type.kind) * (type.size == 0 ? 1 : type.size);
-}
-
 uint8_t* valueAddr(Value val) {
     return stack + val.offset;
 }

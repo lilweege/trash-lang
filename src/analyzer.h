@@ -35,6 +35,8 @@ typedef struct {
 
 const char* typeKindName(TypeKind type);
 const char* typeKindKeyword(TypeKind type);
+size_t typeKindSize(TypeKind kind);
+size_t typeSize(Type type);
 TypeKind unaryResultTypeKind(TypeKind type, NodeKind op);
 TypeKind binaryResultTypeKind(TypeKind type1, TypeKind type2, NodeKind op);
 

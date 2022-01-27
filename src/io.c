@@ -43,6 +43,7 @@ void fwWriteChunkOrCrash(FileWriter* fw, char* fmt, ...) {
         }
     }
 
+    // TODO: only flush to buffer when full
     va_list args;
     va_start(args, fmt);
     int numBytes = vsnprintf(tmpBuf, TMP_BUF_SZ, fmt, args);

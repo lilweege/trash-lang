@@ -140,7 +140,7 @@ uint32_t svHash(StringView sv) {
     return hash;
 }
 
-bool svToCStr(StringView sv, char* outBuf, size_t* outEnd) {
+bool svToCStr(StringView sv, char* outBuf, size_t* outSize) {
     size_t escaped = 0;
     size_t sz = sv.size;
     size_t i;
@@ -163,8 +163,8 @@ bool svToCStr(StringView sv, char* outBuf, size_t* outEnd) {
         outBuf[i-escaped] = ch;
     }
     outBuf[sz-escaped] = 0;
-    if (outEnd != NULL) {
-        *outEnd = sz-escaped;
+    if (outSize != NULL) {
+        *outSize = sz-escaped;
     }
     return true;
 }
