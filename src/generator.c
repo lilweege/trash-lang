@@ -226,11 +226,19 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         AST* rval = statement->right;
         Token id = lval->token;
         Symbol* var = hmGet(symbolTable, id.text);
-        size_t stackTop = rspOffset;
-        Value rv = generateExpression(rval, symbolTable, asmWriter);
-        rspOffset = stackTop;
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN\n");
-        
+        size_t stackTop = rspOffset;
+
+        fwWriteChunkOrCrash(asmWriter, "  xor rcx, rcx\n");
+        AST* subscript = lval->left;
+        bool hasSubscript = subscript != NULL;
+        if (hasSubscript) {
+            fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN subscript\n");
+            Value indexResult = generateExpression(subscript, symbolTable, asmWriter);
+            fwWriteChunkOrCrash(asmWriter, "  mov rcx, [rbp+%d]\n", indexResult.offset);
+        }
+
+        Value rv = generateExpression(rval, symbolTable, asmWriter);
         if (var->val.type.kind == TYPE_U8 &&
                 var->val.type.size != 0 &&
                 rv.type.kind == TYPE_STR) {
@@ -243,25 +251,17 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         }
         else {
             fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", rv.offset);
-            fwWriteChunkOrCrash(asmWriter, "  xor rcx, rcx\n");
-            AST* subscript = lval->left;
-            bool hasSubscript = subscript != NULL;
-            if (hasSubscript) {
-                fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN subscript\n");
-                stackTop = rspOffset;
-                Value indexResult = generateExpression(subscript, symbolTable, asmWriter);
-                rspOffset = stackTop;
-                fwWriteChunkOrCrash(asmWriter, "  mov rcx, [rbp+%d]\n", indexResult.offset);
-            }
             if (var->val.type.kind == TYPE_U8) {
-                fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp+%d+rcx], al\n", 
+                fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp+rcx+%d], al\n", 
                     var->val.offset);
             }
             else {
-                fwWriteChunkOrCrash(asmWriter, "  mov [rbp+%d+rcx*8], rax\n", 
+                fwWriteChunkOrCrash(asmWriter, "  mov [rbp+rcx*8+%d], rax\n", 
                     var->val.offset);
             }
         }
+
+        rspOffset = stackTop;
     }
     else {
         size_t stackTop = rspOffset;
