@@ -34,7 +34,7 @@ size_t typeSize(Type type) {
 }
 
 TypeKind unaryResultTypeKind(TypeKind kind, NodeKind op) {
-    if (kind == TYPE_NONE || kind == TYPE_STR) {
+    if (kind == TYPE_NONE || kind == TYPE_STR || kind == TYPE_U8) {
         return TYPE_NONE;
     }
     switch (op) {
@@ -49,7 +49,8 @@ TypeKind unaryResultTypeKind(TypeKind kind, NodeKind op) {
 
 TypeKind binaryResultTypeKind(TypeKind kind1, TypeKind kind2, NodeKind op) {
     if (kind1 == TYPE_NONE || kind2 == TYPE_NONE ||
-        kind1 == TYPE_STR || kind2 == TYPE_STR) {
+        kind1 == TYPE_STR || kind2 == TYPE_STR ||
+        kind1 == TYPE_U8 || kind2 == TYPE_U8) {
         // cannot operate on none type (void) or string literal
         return TYPE_NONE;
     }
