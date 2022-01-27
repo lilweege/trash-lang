@@ -11,7 +11,7 @@ NOTE: This is very much an unfinished work in progess (as evident by the mess of
 - [x] Statically typed
   - [x] Integer arithmetic
   - [x] Floating-point arithmetic
-  - [ ] Strings
+  - [x] Strings
 - [x] Loops (`while`)
 - [x] Conditionals (`if`/`else`)
 - [x] Arrays
@@ -25,26 +25,39 @@ NOTE: This is very much an unfinished work in progess (as evident by the mess of
 ## Quick Start
 
 
-#### Unix
+#### Unix / WSL
 
-I have not tested this on a mac, so please let me know if you try. It should work otherwise on Linux.
+##### Compilation
 
-- Run GNU `make`.
+[NASM](https://nasm.us/) is required to assemble the generated `.asm` file. Nasm can be installed via your package manager of choice (for instance `apt install nasm` on Debian).
 
 ```console
 $ make
-$ ./bin/trash -r examples/hello1.trash
+$ ./bin/trash -c examples/hello.trash
+$ ./hello
+```
+
+##### Simulation
+
+```console
+$ make
+$ ./bin/trash -r examples/hello.trash
 ```
 
 #### Windows
 
-Any of the following are viable options for building the project:
+Requirements
+- msvc
+
+##### Compilation
+
+Windows is currently not a supported compilation target.
+
+##### Simulation
 
 - Run the `make.bat` script by typing `make` or `.\make.bat` from an msvc-enabled terminal.
-- Run GNU `make` from within a WSL terminal.
-- Run MinGW `make`.
 
 ```console
-> make
-> .\bin\trash.exe -r examples\hello1.trash
+> .\make.bat
+> .\bin\trash.exe -r examples\hello.trash
 ```
