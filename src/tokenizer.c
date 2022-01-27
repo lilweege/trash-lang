@@ -58,12 +58,9 @@ bool pollToken(Tokenizer* tokenizer) {
     do {
         // whitespace
         size_t linesBefore, colsBefore;
-
         linesBefore = tokenizer->curPos.line;
         colsBefore = tokenizer->curPos.col;
         svLeftTrim(&tokenizer->source, &tokenizer->curPos.line, &tokenizer->curPos.col);
-        lineDiff = tokenizer->curPos.line - linesBefore;
-        colDiff = tokenizer->curPos.col - colsBefore;
 
         // line comment beginning with '?'
         if (tokenizer->source.size == 0) {
@@ -76,10 +73,13 @@ bool pollToken(Tokenizer* tokenizer) {
                 svLeftChop(&tokenizer->source, tokenizer->source.size);
                 break;
             }
-            svLeftChop(&tokenizer->source, commentEnd);
-            // tokenizer->curPos.line++;
-            // tokenizer->curPos.col = 1;
+            svLeftChop(&tokenizer->source, commentEnd+1);
+            tokenizer->curPos.line++;
+            tokenizer->curPos.col = 0;
         }
+
+        lineDiff = tokenizer->curPos.line - linesBefore;
+        colDiff = tokenizer->curPos.col - colsBefore;
     } while (lineDiff != 0 || colDiff != 0);
 
     if (tokenizer->source.size == 0) {
@@ -312,7 +312,7 @@ bool pollToken(Tokenizer* tokenizer) {
                 }
             }
             else {
-                fprintf(stderr, "ERROR: Unhandled character '%c'\n", curChar);
+                fprintf(stderr, "ERROR: Unhandled character %d: '%c'\n", curChar, curChar);
                 exit(1);
             }
         }
