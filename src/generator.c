@@ -229,14 +229,8 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN\n");
         size_t stackTop = rspOffset;
 
-        fwWriteChunkOrCrash(asmWriter, "  xor rcx, rcx\n");
         AST* subscript = lval->left;
         bool hasSubscript = subscript != NULL;
-        if (hasSubscript) {
-            fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN subscript\n");
-            Value indexResult = generateExpression(subscript, symbolTable, asmWriter);
-            fwWriteChunkOrCrash(asmWriter, "  mov rcx, [rbp+%d]\n", indexResult.offset);
-        }
 
         Value rv = generateExpression(rval, symbolTable, asmWriter);
         if (var->val.type.kind == TYPE_U8 &&
@@ -250,14 +244,27 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
             fwWriteChunkOrCrash(asmWriter, "  call memcp\n");
         }
         else {
-            fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", rv.offset);
-            if (var->val.type.kind == TYPE_U8) {
-                fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp+rcx+%d], al\n", 
-                    var->val.offset);
+            // TODO: I think this is still very broken for chars
+            if (hasSubscript) {
+                fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN subscript\n");
+                Value indexResult = generateExpression(subscript, symbolTable, asmWriter);
+                fwWriteChunkOrCrash(asmWriter, "  mov rcx, [rbp+%d]\n", indexResult.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", rv.offset);
+                if (var->val.type.kind == TYPE_U8) {
+                    fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp+rcx+%d], al\n", var->val.offset);
+                }
+                else {
+                    fwWriteChunkOrCrash(asmWriter, "  mov [rbp+rcx*8+%d], rax\n", var->val.offset);
+                }
             }
             else {
-                fwWriteChunkOrCrash(asmWriter, "  mov [rbp+rcx*8+%d], rax\n", 
-                    var->val.offset);
+                fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp+%d]\n", rv.offset);
+                if (var->val.type.kind == TYPE_U8) {
+                    fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp+%d], al\n", var->val.offset);
+                }
+                else {
+                    fwWriteChunkOrCrash(asmWriter, "  mov [rbp+%d], rax\n", var->val.offset);
+                }
             }
         }
 
