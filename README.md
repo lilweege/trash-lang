@@ -46,9 +46,6 @@ $ ./bin/trash -r examples/hello.trash
 
 #### Windows
 
-Requirements
-- msvc
-
 ##### Compilation
 
 Windows is currently not a supported compilation target.
