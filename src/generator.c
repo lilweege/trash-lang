@@ -138,7 +138,7 @@ void generateConditional(AST* statement, HashMap* symbolTable, FileWriter* asmWr
 
         if (hasElse) {
             AST* elseBody = left->right;
-            HashMap innerScope = hmCopy(*symbolTable);
+            innerScope = hmCopy(*symbolTable);
             if (elseBody->kind == NODE_BLOCK) {
                 AST* first = elseBody->right;
                 generateStatements(first, &innerScope, asmWriter);
@@ -491,7 +491,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
             // INDEX IN RCX
 
             rspOffset += 8;
-            if (typeSize(var->val.type) == 1) {
+            if (var->val.type.kind == TYPE_U8) {
                 fwWriteChunkOrCrash(asmWriter, "  mov al, BYTE [rbp-%d+rcx] \n", var->val.offset);
                 fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp-%d], al\n", rspOffset);
             }
