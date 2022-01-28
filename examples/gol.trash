@@ -1,4 +1,3 @@
-? TODO: fix char arrays and rewrite this example
 ? TODO: add sleep time
 ? TODO: come up with more interesting initial conditions
 
@@ -10,26 +9,32 @@ i64 H; H = 10;
 ? SIZE = (W+1) * H
 ? add one to width for new lines
 ? board will be printed with puts
-i64[200] prvBoard;
-i64[200] curBoard;
+u8[211] prvBoard;
+u8[211] curBoard;
 
 ? initialize memory
 i64 i; i = 0;
 while (i < H) {
     i64 j; j = 0;
     while (j < W) {
-        i64 idx; idx = i * W + j;
-        prvBoard[idx] = 0;
-        curBoard[idx] = 0;
+        i64 idx; idx = i * (W+1) + j;
+        prvBoard[idx] = ' ';
+        curBoard[idx] = ' ';
         j = j + 1;
     }
+    i64 idx; idx = i * (W+1) + j;
+    prvBoard[idx] = '\n';
+    curBoard[idx] = '\n';
     i = i + 1;
 }
+prvBoard[210] = itoc(0);
+curBoard[210] = itoc(0);
+
 
 ? initial conditions
-prvBoard[21] = 1;
-prvBoard[22] = 1;
-prvBoard[23] = 1;
+prvBoard[25] = '*';
+prvBoard[26] = '*';
+prvBoard[27] = '*';
 
 
 ? VT escape codes
@@ -40,8 +45,8 @@ u8[8] cursorHome;
 cursorHome = ".[H";
 cursorHome[0] = itoc(27);
 
-
 puts(cursorClear);
+
 i64 playing; playing = 1;
 while (playing) {
 
@@ -64,8 +69,9 @@ while (playing) {
                         i64 ni; ni = i + di;
                         i64 nj; nj = j + dj;
                         if (ni >= 0 && ni < H && nj >= 0 && nj < W) {
-                            i64 nIdx; nIdx = ni * W + nj;
-                            if (prvBoard[nIdx]) {
+                            i64 nIdx; nIdx = ni * (W+1) + nj;
+
+                            if (ctoi(prvBoard[nIdx]) == ctoi('*')) {
                                 neighbors = neighbors + 1;
                             }
                         }
@@ -77,22 +83,22 @@ while (playing) {
             }
 
 
-            ? apply GOL rules
-            i64 idx; idx = i * W + j;
-            if (prvBoard[idx]) {
+            i64 idx; idx = i * (W+1) + j;
+
+            if (ctoi(prvBoard[idx]) == ctoi('*')) {
                 if (neighbors < 2 || neighbors > 3) {
-                    curBoard[idx] = 0;
+                    curBoard[idx] = ' ';
                 }
                 else {
-                    curBoard[idx] = 1;
+                    curBoard[idx] = '*';
                 }
             }
             else {
                 if (neighbors != 3) {
-                    curBoard[idx] = 0;
+                    curBoard[idx] = ' ';
                 }
                 else {
-                    curBoard[idx] = 1;
+                    curBoard[idx] = '*';
                 }
             }
 
@@ -101,24 +107,19 @@ while (playing) {
         i = i + 1;
     }
 
-    ? copy and print board
+    ? print game state
     puts(cursorHome);
+    puts(curBoard);
+
+    ? copy boards
     i = 0;
     while (i < H) {
         i64 j; j = 0;
         while (j < W) {
-            i64 idx; idx = i * W + j;
-            if (curBoard[idx]) {
-                putc('*');
-            }
-            else {
-                putc(' ');
-            }
+            i64 idx; idx = i * (W+1) + j;
             prvBoard[idx] = curBoard[idx];
             j = j + 1;
         }
-        putc('\n');
         i = i + 1;
     }
 }
-
