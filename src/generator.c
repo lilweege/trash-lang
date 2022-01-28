@@ -116,13 +116,15 @@ void generateConditional(AST* statement, HashMap* symbolTable, FileWriter* asmWr
                     condition->token.pos.col);
 
         AST* ifBody = conditional->right;
+        HashMap innerScope = hmCopy(*symbolTable);
         if (ifBody->kind == NODE_BLOCK) {
             AST* first = ifBody->right;
-            generateStatements(first, symbolTable, asmWriter);
+            generateStatements(first, &innerScope, asmWriter);
         }
         else {
-            generateStatement(ifBody, symbolTable, asmWriter);
+            generateStatement(ifBody, &innerScope, asmWriter);
         }
+        hmFree(innerScope);
 
         if (hasElse) {
             fwWriteChunkOrCrash(asmWriter, "  ; NODE_ELSE\n");
@@ -136,13 +138,15 @@ void generateConditional(AST* statement, HashMap* symbolTable, FileWriter* asmWr
 
         if (hasElse) {
             AST* elseBody = left->right;
+            HashMap innerScope = hmCopy(*symbolTable);
             if (elseBody->kind == NODE_BLOCK) {
                 AST* first = elseBody->right;
-                generateStatements(first, symbolTable, asmWriter);
+                generateStatements(first, &innerScope, asmWriter);
             }
             else {
-                generateStatement(elseBody, symbolTable, asmWriter);
+                generateStatement(elseBody, &innerScope, asmWriter);
             }
+            hmFree(innerScope);
             fwWriteChunkOrCrash(asmWriter, ".done%d_%d:\n",
                         condition->token.pos.line,
                         condition->token.pos.col);
@@ -166,13 +170,15 @@ void generateConditional(AST* statement, HashMap* symbolTable, FileWriter* asmWr
                     condition->token.pos.col);
     
         AST* body = conditional->right;
+        HashMap innerScope = hmCopy(*symbolTable);
         if (body->kind == NODE_BLOCK) {
             AST* first = body->right;
-            generateStatements(first, symbolTable, asmWriter);
+            generateStatements(first, &innerScope, asmWriter);
         }
         else {
-            generateStatement(body, symbolTable, asmWriter);
+            generateStatement(body, &innerScope, asmWriter);
         }
+        hmFree(innerScope);
 
         fwWriteChunkOrCrash(asmWriter, "  jmp .loop%d_%d\n",
                     condition->token.pos.line,
@@ -207,7 +213,7 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         size_t offset = typeKindSize(assignTypeKind) * (arrSize == 0 ? 1 : arrSize);
         offset += 8 - ((rspOffset-1) & (8-1)) - 1;
         rspOffset += offset;
-        fwWriteChunkOrCrash(asmWriter, "  ; "SV_FMT" has offset %d\n", SV_ARG(id.text), rspOffset);
+        fwWriteChunkOrCrash(asmWriter, "  ; NODE_DEFINITION "SV_FMT" has offset %d\n", SV_ARG(id.text), rspOffset);
 
         Symbol newVar = (Symbol) {
             .id = id.text,
@@ -226,7 +232,6 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         AST* rval = statement->right;
         Token id = lval->token;
         Symbol* var = hmGet(symbolTable, id.text);
-        fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN\n");
         size_t stackTop = rspOffset;
 
         AST* subscript = lval->left;
@@ -237,6 +242,7 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
                 var->val.type.size != 0 &&
                 rv.type.kind == TYPE_STR) {
             // special case string assign
+            fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN string\n");
             fwWriteChunkOrCrash(asmWriter, "  lea rdi, [rbp-%d]\n", var->val.offset); // dst
             fwWriteChunkOrCrash(asmWriter, "  mov rsi, [rbp-%d+8]\n", rv.offset); // src
             fwWriteChunkOrCrash(asmWriter, "  mov rdx, [rbp-%d]\n", rv.offset); // cnt
@@ -259,6 +265,7 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
                 }
             }
             else {
+                fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN\n");
                 fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp-%d]\n", rv.offset);
                 if (var->val.type.kind == TYPE_U8) {
                     fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp-%d], al\n", var->val.offset);
