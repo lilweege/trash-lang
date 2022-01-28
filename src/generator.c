@@ -204,10 +204,10 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         TypeKind assignTypeKind = svCmp(svFromCStr("u8"), typeName.text) == 0 ? TYPE_U8 :
                                 svCmp(svFromCStr("i64"), typeName.text) == 0 ? TYPE_I64 : TYPE_F64;
         
-        fwWriteChunkOrCrash(asmWriter, "  ; "SV_FMT" has offset %d\n", SV_ARG(id.text), rspOffset);
         size_t offset = typeKindSize(assignTypeKind) * (arrSize == 0 ? 1 : arrSize);
         offset += 8 - ((rspOffset-1) & (8-1)) - 1;
         rspOffset += offset;
+        fwWriteChunkOrCrash(asmWriter, "  ; "SV_FMT" has offset %d\n", SV_ARG(id.text), rspOffset);
 
         Symbol newVar = (Symbol) {
             .id = id.text,
@@ -216,7 +216,7 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
                     .kind = assignTypeKind,
                     .size = arrSize
                 },
-                .offset = rspOffset - offset
+                .offset = rspOffset
             }
         };
         hmPut(symbolTable, newVar);
@@ -237,20 +237,10 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
                 var->val.type.size != 0 &&
                 rv.type.kind == TYPE_STR) {
             // special case string assign
-
-
-
-            // NOTE TO ME WHEN I COME BACK TO THIS
-            // arrays are backwards on stack now
-            // this does not do the correct thing, nor does puts
-            // to fix this, either switch arrays, or switch strings
-            // switching strings would probably be harder due to write syscall
-            // I guess time to switch arrays around
-
-            fwWriteChunkOrCrash(asmWriter, "  lea rdi, [rbp-%d]\n", var->val.offset);
-            fwWriteChunkOrCrash(asmWriter, "  mov rsi, [rbp-%d]\n", rv.offset);
-            fwWriteChunkOrCrash(asmWriter, "  mov rdx, [rbp-%d-8]\n", rv.offset);
-            fwWriteChunkOrCrash(asmWriter, "  add rdx, 1\n", rv.offset); // copy null byte
+            fwWriteChunkOrCrash(asmWriter, "  lea rdi, [rbp-%d]\n", var->val.offset); // dst
+            fwWriteChunkOrCrash(asmWriter, "  mov rsi, [rbp-%d+8]\n", rv.offset); // src
+            fwWriteChunkOrCrash(asmWriter, "  mov rdx, [rbp-%d]\n", rv.offset); // cnt
+            fwWriteChunkOrCrash(asmWriter, "  add rdx, 1\n"); // copy null byte
             fwWriteChunkOrCrash(asmWriter, "  call memcp\n");
         }
         else {
@@ -259,7 +249,7 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
                 fwWriteChunkOrCrash(asmWriter, "  ; NODE_ASSIGN subscript\n");
                 Value indexResult = generateExpression(subscript, symbolTable, asmWriter);
                 fwWriteChunkOrCrash(asmWriter, "  mov rcx, [rbp-%d]\n", indexResult.offset);
-                fwWriteChunkOrCrash(asmWriter, "  neg rcx\n");
+                // fwWriteChunkOrCrash(asmWriter, "  neg rcx\n");
                 fwWriteChunkOrCrash(asmWriter, "  mov rax, [rbp-%d]\n", rv.offset);
                 if (var->val.type.kind == TYPE_U8) {
                     fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp-%d+rcx], al\n", var->val.offset);
@@ -307,8 +297,8 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
         fwWriteChunkOrCrash(asmWriter, "  ; CALL PUTS\n");
         if (arguments[0].type.kind == TYPE_STR) {
             fwWriteChunkOrCrash(asmWriter, "  ; STR LIT\n");
-            fwWriteChunkOrCrash(asmWriter, "  mov rdi, [rbp-%d]\n", arguments[0].offset); // addr
-            fwWriteChunkOrCrash(asmWriter, "  mov rsi, [rbp-%d-8]\n", arguments[0].offset); // size
+            fwWriteChunkOrCrash(asmWriter, "  mov rdi, [rbp-%d+8]\n", arguments[0].offset); // addr
+            fwWriteChunkOrCrash(asmWriter, "  mov rsi, [rbp-%d]\n", arguments[0].offset); // size
             fwWriteChunkOrCrash(asmWriter, "  call putss\n");
         }
         else {
@@ -337,53 +327,53 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
     else if (svCmp(svFromCStr("itof"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; ITOF\n");
         fwWriteChunkOrCrash(asmWriter, "  cvtsi2sd xmm0, QWORD [rbp-%d]\n", arguments[0].offset); // nice instruction
-        fwWriteChunkOrCrash(asmWriter, "  movq QWORD [rbp-%d], xmm0\n", rspOffset);
         rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  movq QWORD [rbp-%d], xmm0\n", rspOffset);
         return (Value) {
             .type = {
                 .kind = TYPE_F64,
                 .size = 0
             },
-            .offset = rspOffset-8
+            .offset = rspOffset
         };
     }
     else if (svCmp(svFromCStr("ftoi"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; FTOI\n");
         fwWriteChunkOrCrash(asmWriter, "  cvttsd2si rax, QWORD [rbp-%d]\n", arguments[0].offset); // nice instruction
-        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
         rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
         return (Value) {
             .type = {
                 .kind = TYPE_I64,
                 .size = 0
             },
-            .offset = rspOffset-8
+            .offset = rspOffset
         };
     }
     else if (svCmp(svFromCStr("itoc"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; ITOC\n");
         fwWriteChunkOrCrash(asmWriter, "  mov al, BYTE [rbp-%d]\n", arguments[0].offset);
-        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
         rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
         return (Value) {
             .type = {
                 .kind = TYPE_U8,
                 .size = 0
             },
-            .offset = rspOffset-8
+            .offset = rspOffset
         };
     }
     else if (svCmp(svFromCStr("ctoi"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; CTOI\n");
         fwWriteChunkOrCrash(asmWriter, "  movzx rax, BYTE [rbp-%d]\n", arguments[0].offset);
-        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
         rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
         return (Value) {
             .type = {
                 .kind = TYPE_I64,
                 .size = 0
             },
-            .offset = rspOffset-8
+            .offset = rspOffset
         };
     }
     else {
@@ -403,14 +393,14 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
 Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmWriter) {
     if (expression->kind == NODE_INTEGER) {
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_INTEGER\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], "SV_FMT"\n", rspOffset, SV_ARG(expression->token.text));
         rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], "SV_FMT"\n", rspOffset, SV_ARG(expression->token.text));
         Value lit = (Value) {
             .type = {
                 .kind = TYPE_I64,
                 .size = 0
             },
-            .offset = rspOffset-8
+            .offset = rspOffset
         };
         return lit;
     }
@@ -420,15 +410,15 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
         memcpy(&double_raw, &literal, 8);
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_FLOAT\n");
         fwWriteChunkOrCrash(asmWriter, "  mov rax, 0x%lX ; %.16f\n", double_raw, literal);
-        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
         rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
 
         return (Value) {
             .type = {
                 .kind = TYPE_F64,
                 .size = 0
             },
-            .offset = rspOffset-8
+            .offset = rspOffset
         };
     }
     else if (expression->kind == NODE_CHAR) {
@@ -443,14 +433,14 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                 default: assert(0);
             }
         }
-        fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp-%d], %d\n", rspOffset, ch);
         rspOffset += 8;
+        fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp-%d], %d\n", rspOffset, ch);
         Value lit = (Value) {
             .type = {
                 .kind = TYPE_U8,
                 .size = 0
             },
-            .offset = rspOffset-8
+            .offset = rspOffset
         };
         return lit;
     }
@@ -458,15 +448,15 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_STRING\n");
 
         // push addr to stack
+        rspOffset += 8;
         fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], s%d\n", rspOffset, numStrings);
-        rspOffset += 8;
         // push size to stack
-        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], l%d\n", rspOffset, numStrings);
         rspOffset += 8;
-
+        fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], l%d\n", rspOffset, numStrings);
+        
         // to access them
-            // [rbp-%d]   -> addr
-            // [rbp-%d-8] -> size
+            // [rbp-%d+8]   -> addr
+            // [rbp-%d] -> size
         
         staticStrings[numStrings++] = expression->token.text;
         return (Value) {
@@ -474,7 +464,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                 .kind = TYPE_STR,
                 .size = 0
             },
-            .offset = rspOffset-16
+            .offset = rspOffset
         };
     }
     else if (expression->kind == NODE_CALL) {
@@ -490,9 +480,10 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
             fwWriteChunkOrCrash(asmWriter, "  ; NODE_LVALUE subscript\n");
             Value indexResult = generateExpression(subscript, symbolTable, asmWriter);
             fwWriteChunkOrCrash(asmWriter, "  mov rcx, [rbp-%d]\n", indexResult.offset);
-            fwWriteChunkOrCrash(asmWriter, "  neg rcx\n");
+            // fwWriteChunkOrCrash(asmWriter, "  neg rcx\n");
             // INDEX IN RCX
 
+            rspOffset += 8;
             if (typeSize(var->val.type) == 1) {
                 fwWriteChunkOrCrash(asmWriter, "  mov al, BYTE [rbp-%d+rcx] \n", var->val.offset);
                 fwWriteChunkOrCrash(asmWriter, "  mov BYTE [rbp-%d], al\n", rspOffset);
@@ -501,13 +492,12 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                 fwWriteChunkOrCrash(asmWriter, "  mov rax, QWORD [rbp-%d+rcx*8] \n", var->val.offset);
                 fwWriteChunkOrCrash(asmWriter, "  mov QWORD [rbp-%d], rax\n", rspOffset);
             }
-            rspOffset += 8;
             return (Value) {
                 .type = {
                     .kind = var->val.type.kind,
                     .size = 0
                 },
-                .offset = rspOffset-8
+                .offset = rspOffset
             };
         }
         return var->val;
@@ -532,14 +522,14 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                 } break;
                 default: assert(0);
             }
-            fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], rax\n", rspOffset);
             rspOffset += 8;
+            fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], rax\n", rspOffset);
             return (Value) {
                 .type = {
                     .kind = TYPE_I64,
                     .size = 0
                 },
-                .offset = rspOffset-8
+                .offset = rspOffset
             };
         }
         else if (a.type.kind == TYPE_F64) {
@@ -562,6 +552,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                 default: assert(0);
             }
             TypeKind resultKind = unaryResultTypeKind(a.type.kind, expression->kind);
+            rspOffset += 8;
             if (resultKind == TYPE_I64) {
                 fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], rax\n", rspOffset);
             }
@@ -571,13 +562,12 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
             else {
                 assert(0 && "Invalid result type kind");
             }
-            rspOffset += 8;
             return (Value) {
                 .type = {
                     .kind = resultKind,
                     .size = 0
                 },
-                .offset = rspOffset-8
+                .offset = rspOffset
             };
         }
         else {
@@ -656,14 +646,14 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
 
                 default: assert(0);
             }
-            fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], rax\n", rspOffset);
             rspOffset += 8;
+            fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], rax\n", rspOffset);
             return (Value) {
                 .type = {
                     .kind = TYPE_I64,
                     .size = 0
                 },
-                .offset = rspOffset-8
+                .offset = rspOffset
             };
         }
         else if (a.type.kind == TYPE_F64) {
@@ -738,13 +728,12 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
             }
 
             TypeKind resultKind = binaryResultTypeKind(a.type.kind, b.type.kind, expression->kind);
+            rspOffset += 8;
             if (resultKind == TYPE_I64) {
                 fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], rax\n", rspOffset);
-                rspOffset += 8;
             }
             else if (resultKind == TYPE_F64) {
                 fwWriteChunkOrCrash(asmWriter, "  movsd [rbp-%d], xmm0\n", rspOffset);
-                rspOffset += 8;
             }
             else {
                 assert(0 && "Invalid result type kind");
@@ -755,7 +744,7 @@ Value generateExpression(AST* expression, HashMap* symbolTable, FileWriter* asmW
                     .kind = resultKind,
                     .size = 0
                 },
-                .offset = rspOffset-8
+                .offset = rspOffset
             };
         }
         else {
