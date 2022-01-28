@@ -245,7 +245,7 @@ Value evaluateCall(AST* call, HashMap* symbolTable) {
     else if (svCmp(svFromCStr("itoc"), call->token.text) == 0) {
         Value ret = (Value) {
             .type = {
-                .kind = TYPE_I64,
+                .kind = TYPE_U8,
                 .size = 0
             },
             .offset = stackPush(typeKindSize(TYPE_I64))
@@ -256,7 +256,7 @@ Value evaluateCall(AST* call, HashMap* symbolTable) {
     else if (svCmp(svFromCStr("ctoi"), call->token.text) == 0) {
         Value ret = (Value) {
             .type = {
-                .kind = TYPE_U8,
+                .kind = TYPE_I64,
                 .size = 0
             },
             .offset = stackPush(typeKindSize(TYPE_U8))
