@@ -13,8 +13,6 @@
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
-#include <unistd.h>
-#include <sys/wait.h>
 
 #define COMPILE_MESSAGE(filename, msg, line, col, fmt, args) do { \
     fprintf(stderr, "%s:%zu:%zu: "msg": ", \
@@ -91,6 +89,10 @@ void compileArguments(int argc, char** argv) {
     }
 }
 
+// yoinked
+#define WIFEXITED(x) (((x) & 0x7f) == 0)
+#define WEXITSTATUS(x) (((x) & 0xff00) >> 8)
+
 void execAndEcho(const char* command) {
     // command should be sanitized by now
     printf("%s\n", command);
@@ -118,6 +120,11 @@ void execAndEcho(const char* command) {
 }
 
 void compileFile(char* filename) {
+#ifdef WINDOWS
+    (void) filename;
+    fprintf(stderr, "ERROR: Compilation is not currently supported on windows.\n");
+#else
+
 #define PATH_MAX 256
 #define TMP_BUF_SZ 2 * PATH_MAX + 32
     static char cmdBuf[TMP_BUF_SZ];
@@ -142,7 +149,7 @@ void compileFile(char* filename) {
     }
 
     // check extension
-    const int pathnameLen = fnLen - expectedExtension.size;
+    const int pathnameLen = (int)(fnLen - expectedExtension.size);
     StringView fn = svFromCStr(filename);
     StringView actualExtension = svSubstring(fn, pathnameLen, fnLen);
     if (svCmp(expectedExtension, actualExtension) != 0) {
@@ -176,7 +183,7 @@ void compileFile(char* filename) {
     free(fileContent);
 
     // assemble and link
-    const int basenameLen = pathnameLen - pathEndIdx;
+    const int basenameLen = (int)(pathnameLen - pathEndIdx);
     snprintf(cmdBuf, TMP_BUF_SZ, "nasm -felf64"
 #ifdef DEBUG
              " -g -wall"
@@ -187,7 +194,7 @@ void compileFile(char* filename) {
     printf("EXEC: ");
     execAndEcho(cmdBuf);
 
-    snprintf(cmdBuf, TMP_BUF_SZ, "ld -o %.*s %.*s.o",
+    snprintf(cmdBuf, TMP_BUF_SZ, "ld -o %.*s.out %.*s.o",
              basenameLen, asmFilename,
              basenameLen, asmFilename);
     printf("EXEC: ");
@@ -195,6 +202,7 @@ void compileFile(char* filename) {
 
 #undef PATH_MAX
 #undef TMP_BUF_SZ
+#endif
 }
 
 void simulateFile(char* filename) {

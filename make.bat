@@ -14,7 +14,7 @@ if "%errorlevel%" == "0" goto hasCL
 :: alternatively, simply run this script from an msvc-enabled developer console
 
 :: TODO: compile with /WX
-set CFLAGS_COMMON=/nologo /W4 /wd4996 /std:c11 /TC
+set CFLAGS_COMMON=/nologo /W4 /wd4996 /std:c11 /TC /DWINDOWS
 set CFLAGS_DEBUG=/Zi /Od /DDEBUG
 set CFLAGS_RELEASE=/O2
 set CFLAGS=%CFLAGS_COMMON% %CFLAGS_DEBUG%
