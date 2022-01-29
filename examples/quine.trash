@@ -1,0 +1,5 @@
+u8 q; q = itoc(34); u8 nl; nl = itoc(10);
+u8[512]f;f="u8 q; q = itoc(34); u8 nl; nl = itoc(10);";
+u8[512]d;d="u8[512]";
+u8[512]x;x="puts(f);putc(nl);puts(d);putc('f');putc(';');putc('f');putc('=');putc(q);puts(f);putc(q);putc(';');putc(nl);puts(d);putc('d');putc(';');putc('d');putc('=');putc(q);puts(d);putc(q);putc(';');putc(nl);puts(d);putc('x');putc(';');putc('x');putc('=');putc(q);puts(x);putc(q);putc(';');putc(nl);puts(x);";
+puts(f);putc(nl);puts(d);putc('f');putc(';');putc('f');putc('=');putc(q);puts(f);putc(q);putc(';');putc(nl);puts(d);putc('d');putc(';');putc('d');putc('=');putc(q);puts(d);putc(q);putc(';');putc(nl);puts(d);putc('x');putc(';');putc('x');putc('=');putc(q);puts(x);putc(q);putc(';');putc(nl);puts(x);
