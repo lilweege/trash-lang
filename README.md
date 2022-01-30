@@ -6,8 +6,8 @@ NOTE: This is very much an unfinished work in progess (as evident by the mess of
 
 ## Features
 - [x] Compiled
-  - [x] x86_64 Linux NASM
-  - [ ] x86_64 Windows NASM
+  - [x] x86_64 Linux FASM
+  - [ ] x86_64 Windows FASM
 - [x] Statically typed
   - [x] Integer arithmetic
   - [x] Floating-point arithmetic
