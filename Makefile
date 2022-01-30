@@ -17,9 +17,11 @@ LD_RELEASE =
 # assuming mingw
 ifeq ($(OS), Windows_NT)
 	TARGET = $(BIN)/trash.exe
+	CC_COMMON += -DWINDOWS
 	# TODO: do windows specific stuff
 else
 	TARGET = $(BIN)/trash
+	CC_COMMON += -DLINUX
 	# unfortunately mingw does not seem to support asan
 	CC_DEBUG += -fsanitize=undefined
 	LD_DEBUG += -fsanitize=undefined
