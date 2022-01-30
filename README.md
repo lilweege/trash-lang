@@ -24,12 +24,11 @@ NOTE: This is very much an unfinished work in progess (as evident by the mess of
 
 ## Quick Start
 
-
-#### Unix / WSL
+#### Unix / WSL2
 
 ##### Compilation
 
-[NASM](https://nasm.us/) is required to assemble the generated `.asm` file. Nasm can be installed via your package manager of choice (for instance `apt install nasm` on Debian).
+[FASM](https://flatassembler.net/) is required to assemble the compiler-generated `.asm` files. It can be installed via your package manager of choice (for instance `apt install fasm` on Debian). After installation, ensure fasm is added to your path.
 
 ```console
 $ make

@@ -15,10 +15,10 @@ size_t numStrings = 0;
 void generateProgram(const char* outputFilename, AST* program) {
     FileWriter asmWriter = fwCreate(outputFilename);
     // necessary preamble
-    fwWriteChunkOrCrash(&asmWriter, "; compiler-generated Linux x86-64 NASM file\n");
-    fwWriteChunkOrCrash(&asmWriter, "BITS 64\n");
-    fwWriteChunkOrCrash(&asmWriter, "global _start\n");
-    fwWriteChunkOrCrash(&asmWriter, "section .text\n");
+    fwWriteChunkOrCrash(&asmWriter, "; compiler-generated Linux x86-64 FASM file\n");
+    fwWriteChunkOrCrash(&asmWriter, "format ELF64 executable 3\n");
+    fwWriteChunkOrCrash(&asmWriter, "segment readable executable\n");
+    fwWriteChunkOrCrash(&asmWriter, "entry _start\n");
     // subroutine to write sized string to stdout
     fwWriteChunkOrCrash(&asmWriter, "putss:\n  mov rdx, rsi\n  mov rsi, rdi\n  mov eax, 1\n  mov edi, 1\n  syscall\n  ret\n");
     // subroutine to write c-string to stdout
@@ -48,10 +48,10 @@ void generateProgram(const char* outputFilename, AST* program) {
     fwWriteChunkOrCrash(&asmWriter, "  xor rdi, rdi\n");
     fwWriteChunkOrCrash(&asmWriter, "  syscall\n");
     // rodata section (strings)
-    fwWriteChunkOrCrash(&asmWriter, "section .data\n");
+    fwWriteChunkOrCrash(&asmWriter, "segment readable writable\n");
 
     for (size_t i = 0; i < numStrings; ++i) {
-        fwWriteChunkOrCrash(&asmWriter, "  s%zu db ", i);
+        fwWriteChunkOrCrash(&asmWriter, "  s%zu: db ", i);
         StringView sv = staticStrings[i];
         for (size_t j = 0; j < sv.size; ++j) {
             char ch = sv.data[j];
@@ -71,7 +71,7 @@ void generateProgram(const char* outputFilename, AST* program) {
             fwWriteChunkOrCrash(&asmWriter, "%d,", (int) ch);
         }
         fwWriteChunkOrCrash(&asmWriter, "0\n");
-        fwWriteChunkOrCrash(&asmWriter, "  l%zu equ $-s%zu-1\n", i, i);
+        fwWriteChunkOrCrash(&asmWriter, "  l%zu = $ - s%zu - 1\n", i, i);
     }
 
     fwDestroy(asmWriter);
@@ -359,9 +359,9 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
     }
     else if (svCmp(svFromCStr("itoc"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; ITOC\n");
-        fwWriteChunkOrCrash(asmWriter, "  mov al, [rbp-%d]\n", arguments[0].offset);
         rspOffset += 8;
-        fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], rax\n", rspOffset);
+        fwWriteChunkOrCrash(asmWriter, "  movzx eax, BYTE [rbp-%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], eax\n", rspOffset);
         return (Value) {
             .type = {
                 .kind = TYPE_U8,
@@ -372,11 +372,9 @@ Value generateCall(AST* call, HashMap* symbolTable, FileWriter* asmWriter) {
     }
     else if (svCmp(svFromCStr("ctoi"), call->token.text) == 0) {
         fwWriteChunkOrCrash(asmWriter, "  ; CTOI\n");
-        // this could probably be done in place
-        // simply truncate the value and move it back to the same offset
-        fwWriteChunkOrCrash(asmWriter, "  movzx rax, [rbp-%d]\n", arguments[0].offset);
         rspOffset += 8;
-        fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], rax\n", rspOffset);
+        fwWriteChunkOrCrash(asmWriter, "  movzx eax, BYTE [rbp-%d]\n", arguments[0].offset);
+        fwWriteChunkOrCrash(asmWriter, "  mov [rbp-%d], eax\n", rspOffset);
         return (Value) {
             .type = {
                 .kind = TYPE_I64,

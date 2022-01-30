@@ -125,8 +125,8 @@ void compileFile(char* filename) {
     fprintf(stderr, "ERROR: Compilation is not currently supported on windows.\n");
 #else
 
-#define PATH_MAX 256
-#define TMP_BUF_SZ 2 * PATH_MAX + 32
+#define SRC_PATH_MAX 256
+#define TMP_BUF_SZ SRC_PATH_MAX + 32
     static char cmdBuf[TMP_BUF_SZ];
     
     // read file
@@ -136,8 +136,8 @@ void compileFile(char* filename) {
 
     // check filename length
     size_t fnLen = strlen(filename);
-    if (fnLen > PATH_MAX) {
-        fprintf(stderr, "ERROR: File path length exceeded max path length of %d\n", PATH_MAX);
+    if (fnLen > SRC_PATH_MAX) {
+        fprintf(stderr, "ERROR: File path length exceeded max path length of %d\n", SRC_PATH_MAX);
         exit(1);
     }
     StringView expectedExtension = svFromCStr(".trash");
@@ -172,35 +172,21 @@ void compileFile(char* filename) {
     if (svLastIndexOfChar(fn, '/', &pathEndIdx)) {
         pathEndIdx += 1;
     }
-    char outputFilename[PATH_MAX];
+    char outputFilename[SRC_PATH_MAX];
     memcpy(outputFilename, filename, pathnameLen);
     memcpy(outputFilename + pathnameLen, ".asm", 5);
     
     // generate the program
     char* asmFilename = outputFilename + pathEndIdx;
     generateProgram(asmFilename, program);
-    printf("INFO: generated %s\n", asmFilename);
     free(fileContent);
+    printf("INFO: generated %s\n", asmFilename);
 
-    // assemble and link
-    const int basenameLen = (int)(pathnameLen - pathEndIdx);
-    snprintf(cmdBuf, TMP_BUF_SZ, "nasm -felf64"
-#ifdef DEBUG
-             " -g -wall"
-#endif // DEBUG
-             " -o %.*s.o %.*s.asm",
-             basenameLen, asmFilename,
-             basenameLen, asmFilename);
     printf("EXEC: ");
+    snprintf(cmdBuf, TMP_BUF_SZ, "fasm %s", asmFilename);
     execAndEcho(cmdBuf);
 
-    snprintf(cmdBuf, TMP_BUF_SZ, "ld -o %.*s.out %.*s.o",
-             basenameLen, asmFilename,
-             basenameLen, asmFilename);
-    printf("EXEC: ");
-    execAndEcho(cmdBuf);
-
-#undef PATH_MAX
+#undef SRC_PATH_MAX
 #undef TMP_BUF_SZ
 #endif
 }
