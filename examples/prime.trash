@@ -1,0 +1,55 @@
+
+i64 N; N = 1000000;
+u8[1000001] sieve;
+
+? initialize memory
+sieve[0] = itoc(0);
+sieve[1] = itoc(0);
+i64 k; k = 2;
+while (k < N) {
+    sieve[k] = itoc(1);
+    k = k + 1;
+}
+
+
+? integer square root
+i64 lo; lo = 1;
+i64 hi; hi = N/2;
+i64 root; root = -1;
+while (lo <= hi) {
+    i64 m; m = (lo + hi) / 2;
+    if (m * m <= N) {
+        root = m;
+        lo = m + 1;
+    }
+    else {
+        hi = m - 1;
+    }
+}
+
+
+? sieve of eratosthenes
+i64 i; i = 0;
+while (i <= root) {
+    if (sieve[i]) {
+        i64 j; j = i * i;
+        while (j <= N) {
+            sieve[j] = itoc(0);
+            j = j + i;
+        }
+    }
+    i = i + 1;
+}
+
+
+? count the primes
+i64 cnt; cnt = 0;
+i64 l; l = 0;
+while (l < N) {
+    if (sieve[l])
+        cnt = cnt + 1;
+    l = l + 1;
+}
+
+puti(cnt);
+putc('\n');
