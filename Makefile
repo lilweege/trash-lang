@@ -1,5 +1,4 @@
 BIN = bin
-TEST = test
 OBJ = obj
 SRC = src
 SRCS = $(wildcard $(SRC)/*.c)
@@ -43,20 +42,12 @@ $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS)
 
 
-.PHONY: clean test
-
-test: $(TEST)/testall.c
-	$(CC) $(CCFLAGS) $< $(LDFLAGS) -o $(BIN)/$@
-ifeq ($(OS), Windows_NT)
-	.\$(BIN)\$@
-else
-	./$(BIN)/$@
-endif
+.PHONY: clean
 
 clean:
 ifeq ($(OS), Windows_NT)
-	del $(subst /,\,$(TARGET) $(DEPS) $(OBJS)) $(BIN)\test.exe
+	del $(subst /,\,$(TARGET) $(DEPS) $(OBJS))
 else
-	rm -f $(TARGET) $(DEPS) $(OBJS) $(BIN)/test
+	rm -f $(TARGET) $(DEPS) $(OBJS)
 endif
 

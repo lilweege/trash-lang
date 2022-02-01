@@ -22,7 +22,6 @@ set CFLAGS=%CFLAGS_COMMON% %CFLAGS_DEBUG%
 if "%1%" == ""         goto build
 if "%1%" == "debug"    goto build
 if "%1%" == "release"  goto release
-if "%1%" == "test"     goto test
 if "%1%" == "clean"    goto clean
 echo Invalid argument '%1%'
 goto :EOF
@@ -37,14 +36,6 @@ goto :EOF
     popd
 goto :EOF
 
-:test
-    pushd obj
-        cl %CFLAGS% /Fe..\bin\test.exe ..\test\testall.c
-        set doTest=%errorlevel%
-    popd
-    if "%doTest%" == "0" .\bin\test.exe
-goto :EOF
-
 :clean
-    del bin\trash.exe bin\test.exe obj\*.obj obj\*.pdb bin\*.pdb bin\*.ilk
+    del bin\trash.exe obj\*.obj obj\*.pdb bin\*.pdb bin\*.ilk
 goto :EOF
