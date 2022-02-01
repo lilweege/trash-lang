@@ -2,8 +2,6 @@
 
 My first programming language written from scratch in C
 
-NOTE: This is very much an unfinished work in progess (as evident by the mess of code in `src`). It only barely works with a few of the examples. Many things are subject to change and improve.
-
 ## Features
 - [x] Compiled
   - [x] x86_64 Linux (NASM / GNU ld)
