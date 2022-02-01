@@ -1,30 +1,18 @@
 BIN = bin
 OBJ = obj
 SRC = src
+TARGET = $(BIN)/trash
 SRCS = $(wildcard $(SRC)/*.c)
 OBJS = $(patsubst $(SRC)/%.c,$(OBJ)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 
 # TODO: compile with -Werror
-CC_COMMON = -std=c11 -march=native -Wall -Wextra -Wshadow -Wunused -Wpedantic
-CC_DEBUG = -g -DDEBUG
+CC_COMMON = -std=c11 -march=native -Wall -Wextra -Wshadow -Wunused -Wpedantic -DLINUX
+CC_DEBUG = -g -DDEBUG -fsanitize=undefined
 CC_RELEASE = -O2
 LD_COMMON = 
-LD_DEBUG = 
+LD_DEBUG = -fsanitize=undefined
 LD_RELEASE = 
-
-# assuming mingw
-ifeq ($(OS), Windows_NT)
-	TARGET = $(BIN)/trash.exe
-	CC_COMMON += -DWINDOWS
-	# TODO: do windows specific stuff
-else
-	TARGET = $(BIN)/trash
-	CC_COMMON += -DLINUX
-	# unfortunately mingw does not seem to support asan
-	CC_DEBUG += -fsanitize=undefined
-	LD_DEBUG += -fsanitize=undefined
-endif
 
 CCFLAGS = $(CC_COMMON) $(CC_DEBUG)
 LDFLAGS = $(LD_COMMON) $(LD_DEBUG)
@@ -41,13 +29,6 @@ $(OBJ)/%.o: $(SRC)/%.c
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS)
 
-
 .PHONY: clean
-
 clean:
-ifeq ($(OS), Windows_NT)
-	del $(subst /,\,$(TARGET) $(DEPS) $(OBJS))
-else
 	rm -f $(TARGET) $(DEPS) $(OBJS)
-endif
-
