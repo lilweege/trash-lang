@@ -36,5 +36,5 @@ goto :EOF
 goto :EOF
 
 :clean
-    del bin\trash.exe obj\*.obj obj\*.pdb bin\*.pdb bin\*.ilk
+    del bin\trash.exe obj\*.obj obj\*.pdb bin\*.pdb bin\*.ilk *.asm *.obj *.exe
 goto :EOF

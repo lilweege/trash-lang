@@ -31,4 +31,4 @@ $(TARGET): $(OBJS)
 
 .PHONY: clean
 clean:
-	rm -f $(TARGET) $(DEPS) $(OBJS)
+	rm -f $(TARGET) $(DEPS) $(OBJS) *.asm *.o *.out

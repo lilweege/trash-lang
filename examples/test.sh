@@ -10,7 +10,7 @@ expect() {
     fn=$1
     expect=$2
 
-	$BASEDIR/../bin/trash -c $BASEDIR/$fn.trash >/dev/null && result=$(./$fn)
+	$BASEDIR/../bin/trash -c $BASEDIR/$fn.trash >/dev/null && result=$(./$fn.out)
 	if [ $? -ne 0 ]; then
 		echo "something went wrong"
 		exit 1

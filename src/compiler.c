@@ -126,7 +126,7 @@ void compileFile(char* filename) {
 #else
 
 #define SRC_PATH_MAX 256
-#define TMP_BUF_SZ SRC_PATH_MAX + 32
+#define TMP_BUF_SZ (2 * SRC_PATH_MAX + 128)
     static char cmdBuf[TMP_BUF_SZ];
     
     // read file
@@ -181,10 +181,32 @@ void compileFile(char* filename) {
     generateProgram(asmFilename, program);
     free(fileContent);
     printf("INFO: generated %s\n", asmFilename);
+    
+    const int basenameLen = (int)(pathnameLen - pathEndIdx);
+    printf("EXEC: ");
+#ifdef WINDOWS
+    snprintf(cmdBuf, TMP_BUF_SZ, "nasm -fwin64 \"%.*s.asm\"",
+             basenameLen, asmFilename);
+#else
+    snprintf(cmdBuf, TMP_BUF_SZ, "nasm -felf64 \"%.*s.asm\"",
+             basenameLen, asmFilename);
+#endif
+    execAndEcho(cmdBuf);
+
 
     printf("EXEC: ");
-    snprintf(cmdBuf, TMP_BUF_SZ, "fasm %s", asmFilename);
+#ifdef WINDOWS
+    // msvc
+    snprintf(cmdBuf, TMP_BUF_SZ, "link /nologo /nodefaultlib /subsystem:console /entry:_start \"%.*s.obj\" kernel32.lib",
+             basenameLen, asmFilename);
+#else
+    // gnu
+    snprintf(cmdBuf, TMP_BUF_SZ, "ld -o \"%.*s.out\" \"%.*s.o\"",
+             basenameLen, asmFilename,
+             basenameLen, asmFilename);
+#endif
     execAndEcho(cmdBuf);
+
 
 #undef SRC_PATH_MAX
 #undef TMP_BUF_SZ

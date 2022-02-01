@@ -6,8 +6,8 @@ NOTE: This is very much an unfinished work in progess (as evident by the mess of
 
 ## Features
 - [x] Compiled
-  - [x] x86_64 Linux FASM
-  - [ ] x86_64 Windows FASM
+  - [x] x86_64 Linux (NASM / GNU ld)
+  - [ ] x86_64 Windows (NASM / MSVC link)
 - [x] Statically typed
   - [x] Integer arithmetic
   - [x] Floating-point arithmetic
@@ -15,6 +15,7 @@ NOTE: This is very much an unfinished work in progess (as evident by the mess of
 - [x] Loops (`while`)
 - [x] Conditionals (`if`/`else`)
 - [x] Arrays
+  - [ ] Constexpr-length arrays
   - [ ] Variable-length arrays
 - [ ] User-defined subroutines
 - [ ] User-defined structures
@@ -28,15 +29,15 @@ NOTE: This is very much an unfinished work in progess (as evident by the mess of
 
 ##### Compilation
 
-[FASM](https://flatassembler.net/) is required to assemble the compiler-generated `.asm` files. It can be installed via your package manager of choice (for instance `apt install fasm` on Debian). After installation, ensure fasm is added to your path.
+[NASM](https://nasm.us/) and [GNU ld](https://www.gnu.org/software/binutils/) are required to assemble and link the generated `.asm` file. `nasm` can be installed via your package manager of choice (for instance `apt install nasm` on Debian), `ld` is included with the GNU binutils.
 
 ```console
 $ make
 $ ./bin/trash -c examples/hello.trash
-$ ./hello
+$ ./hello.out
 ```
 
-##### Simulation
+##### Simulation (deprecated)
 
 ```console
 $ make
@@ -49,9 +50,9 @@ $ ./bin/trash -r examples/hello.trash
 
 Windows is currently not a supported compilation target.
 
-##### Simulation
+##### Simulation (deprecated)
 
-- Run the `make.bat` script by typing `make` or `.\make.bat` from an msvc-enabled terminal.
+Run the `make.bat` script by typing `make` or `.\make.bat` from an msvc-enabled terminal.
 
 ```console
 > .\make.bat

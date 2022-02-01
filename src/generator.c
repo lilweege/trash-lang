@@ -8,17 +8,20 @@ size_t rspOffset = 128;
 StringView staticStrings[1024];
 size_t numStrings = 0;
 
-
-
-
-
 void generateProgram(const char* outputFilename, AST* program) {
     FileWriter asmWriter = fwCreate(outputFilename);
+
+    // TODO: windows stuff
+    // the primary differences between windows and linux are the calling conventions and external calls
+    // linux simply has `syscall` but windows has to pull in external symbols and link with kernel32.lib
+    // https://www.cs.uaf.edu/2017/fall/cs301/reference/x86_64.html
+    // https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170
+
     // necessary preamble
-    fwWriteChunkOrCrash(&asmWriter, "; compiler-generated Linux x86-64 FASM file\n");
-    fwWriteChunkOrCrash(&asmWriter, "format ELF64 executable 3\n");
-    fwWriteChunkOrCrash(&asmWriter, "segment readable executable\n");
-    fwWriteChunkOrCrash(&asmWriter, "entry _start\n");
+    fwWriteChunkOrCrash(&asmWriter, "; compiler-generated Linux x86-64 NASM file\n");
+    fwWriteChunkOrCrash(&asmWriter, "BITS 64\n");
+    fwWriteChunkOrCrash(&asmWriter, "global _start\n");
+    fwWriteChunkOrCrash(&asmWriter, "section .text\n");
     // subroutine to write sized string to stdout
     fwWriteChunkOrCrash(&asmWriter, "putss:\n  mov rdx, rsi\n  mov rsi, rdi\n  mov eax, 1\n  mov edi, 1\n  syscall\n  ret\n");
     // subroutine to write c-string to stdout
@@ -36,7 +39,8 @@ void generateProgram(const char* outputFilename, AST* program) {
     fwWriteChunkOrCrash(&asmWriter, "_start:\n");
     fwWriteChunkOrCrash(&asmWriter, "  push rbp\n");
     fwWriteChunkOrCrash(&asmWriter, "  mov rbp, rsp\n");
-    fwWriteChunkOrCrash(&asmWriter, "  sub rsp, 65535\n");
+    // this will matter when implementing subroutines
+    // fwWriteChunkOrCrash(&asmWriter, "  sub rsp, 65535\n");
 
     HashMap symbolTable = hmNew(256);
     generateStatements(program->right, &symbolTable, &asmWriter);
@@ -47,11 +51,11 @@ void generateProgram(const char* outputFilename, AST* program) {
     fwWriteChunkOrCrash(&asmWriter, "  mov rax, 60\n");
     fwWriteChunkOrCrash(&asmWriter, "  xor rdi, rdi\n");
     fwWriteChunkOrCrash(&asmWriter, "  syscall\n");
-    // rodata section (strings)
-    fwWriteChunkOrCrash(&asmWriter, "segment readable writable\n");
+    // data section (strings)
+    fwWriteChunkOrCrash(&asmWriter, "section .data\n");
 
     for (size_t i = 0; i < numStrings; ++i) {
-        fwWriteChunkOrCrash(&asmWriter, "  s%zu: db ", i);
+        fwWriteChunkOrCrash(&asmWriter, "  s%zu db ", i);
         StringView sv = staticStrings[i];
         for (size_t j = 0; j < sv.size; ++j) {
             char ch = sv.data[j];
@@ -71,7 +75,7 @@ void generateProgram(const char* outputFilename, AST* program) {
             fwWriteChunkOrCrash(&asmWriter, "%d,", (int) ch);
         }
         fwWriteChunkOrCrash(&asmWriter, "0\n");
-        fwWriteChunkOrCrash(&asmWriter, "  l%zu = $ - s%zu - 1\n", i, i);
+        fwWriteChunkOrCrash(&asmWriter, "  l%zu equ $ - s%zu - 1\n", i, i);
     }
 
     fwDestroy(asmWriter);
