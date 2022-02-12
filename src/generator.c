@@ -8,7 +8,7 @@ size_t rspOffset = 128;
 StringView staticStrings[1024];
 size_t numStrings = 0;
 
-void generateProgram(const char* outputFilename, AST* program) {
+void generateProgram(const char* outputFilename, AST* program, Target target) {
     FileWriter asmWriter = fwCreate(outputFilename);
 
     // TODO: windows stuff
@@ -18,39 +18,71 @@ void generateProgram(const char* outputFilename, AST* program) {
     // https://docs.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170
 
     // necessary preamble
-    fwWriteChunkOrCrash(&asmWriter, "; compiler-generated Linux x86-64 NASM file\n");
+    if (target == TARGET_LINUX) {
+        fwWriteChunkOrCrash(&asmWriter, "; compiler-generated Linux x86-64 NASM file\n");
+    }
+    else if (target == TARGET_WINDOWS) {
+        fwWriteChunkOrCrash(&asmWriter, "; compiler-generated Windows x86-64 NASM file\n");
+        fwWriteChunkOrCrash(&asmWriter, "extern ExitProcess\n");
+        fwWriteChunkOrCrash(&asmWriter, "extern GetStdHandle\n");
+        fwWriteChunkOrCrash(&asmWriter, "extern WriteFile\n");
+        fwWriteChunkOrCrash(&asmWriter, "extern __chkstk\n");
+    }
+
     fwWriteChunkOrCrash(&asmWriter, "BITS 64\n");
     fwWriteChunkOrCrash(&asmWriter, "global _start\n");
     fwWriteChunkOrCrash(&asmWriter, "section .text\n");
-    // subroutine to write sized string to stdout
-    fwWriteChunkOrCrash(&asmWriter, "putss:\n  mov rdx, rsi\n  mov rsi, rdi\n  mov eax, 1\n  mov edi, 1\n  syscall\n  ret\n");
-    // subroutine to write c-string to stdout
-    fwWriteChunkOrCrash(&asmWriter, "putcs:\n  mov rsi, rdi\n  mov rdx, -1\n.putcs_loop:\n  cmp BYTE [rsi+rdx+1], 0\n  lea rdx, [rdx+1]\n  jne .putcs_loop\n  mov eax, 1\n  mov edi, 1\n  syscall\n  ret\n");
-    // subroutine to write a single char to stdout
-    fwWriteChunkOrCrash(&asmWriter, "putc:\n  push rdi\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea rsi, [rsp]\n  mov rdx, 1\n  syscall\n  pop rax\n  ret\n");
-    // subroutine to write a integer (decimal) to stdout
-    fwWriteChunkOrCrash(&asmWriter, "puti:\n  mov rcx, rdi\n  sub rsp, 40\n  mov r10, rdi\n  mov r11, -3689348814741910323\n  neg rcx\n  cmovs rcx, rdi\n  mov edi, 22-1\n.puti_loop:\n  mov rax, rcx\n  movsx r9, dil\n  mul r11\n  movsx r8, r9b\n  lea edi, [r9-1]\n  mov rsi, r9\n  shr rdx, 3\n  lea rax, [rdx+rdx*4]\n  add rax, rax\n  sub rcx, rax\n  add ecx, 48\n  mov BYTE [rsp+r8], cl\n  mov rcx, rdx\n  test rdx, rdx\n  jne .puti_loop\n  test r10, r10\n  jns .puti_done\n  movsx rax, dil\n  movsx r9d, dil\n  movsx rsi, dil\n  mov BYTE [rsp+rax], 45\n.puti_done:\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea r10, [rsp+rsi]\n  mov rsi, r10\n  mov rdx, 22\n  sub edx, r9d\n  syscall\n  add rsp, 40\n  ret\n");
-    // subroutine to write a double value to stdout
-    fwWriteChunkOrCrash(&asmWriter, "putf:\n  push rbp\n  cvttsd2si rbp, xmm0\n  push rbx\n  mov rbx, rdi\n  sub rsp, 72\n  mov rdi, rbp\n  movsd QWORD [rsp+8], xmm0\n  call puti\n  movsd xmm0, QWORD [rsp+8]\n  pxor xmm1, xmm1\n  comisd xmm1, xmm0\n  jbe .putf_pos\n  mov r8, 0x8000000000000000\n  mov QWORD [rsp], r8\n  movsd xmm1, QWORD [rsp]\n  xorpd xmm0, xmm1\n  cvttsd2si rbp, xmm0\n.putf_pos:\n  pxor xmm1, xmm1\n  mov BYTE [rsp+16], 46\n  cvtsi2sd xmm1, rbp\n  subsd xmm0, xmm1\n  test rbx, rbx\n  je .putf_single\n  lea rax, [rsp+17]\n  mov r8, 0x4024000000000000\n  mov QWORD [rsp], r8\n  movsd xmm2, QWORD [rsp]\n  lea rdi, [rax+rbx]\n.putf_loop:\n  mulsd xmm0, xmm2\n  pxor xmm1, xmm1\n  add rax, 1\n  cvttsd2si rdx, xmm0\n  cvtsi2sd xmm1, rdx\n  lea ecx, [rdx+48]\n  mov BYTE [rax-1], cl\n  subsd xmm0, xmm1\n  cmp rdi, rax\n  jne .putf_loop\n  lea rdx, [rbx+1]\n.putf_done:\n  lea rsi, [rsp+16]\n  mov rax, 1\n  mov rdi, 1\n  syscall\n  add rsp, 72\n  pop rbx\n  pop rbp\n  ret\n.putf_single:\n  mov edx, 1\n  jmp .putf_done\n");
-    // subroutine to copy buffers
-    fwWriteChunkOrCrash(&asmWriter, "memcp:\n  test rdx, rdx\n  je .memcp_done\n  mov eax, 0\n.memcp_loop:\n  movzx ecx, BYTE [rsi+rax]\n  mov BYTE [rdi+rax], cl\n  add rax, 1\n  cmp rdx, rax\n  jne .memcp_loop\n.memcp_done:\n  ret\n");
+    if (target == TARGET_WINDOWS) {
+        // TODO: implement all the functions
+        fwWriteChunkOrCrash(&asmWriter, "putss:\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "putcs:\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "putc:\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "puti:\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "putf:\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "memcp:\n  ret\n");
+    }
+    else if (target == TARGET_LINUX) {
+        fwWriteChunkOrCrash(&asmWriter, "putss:\n  mov rdx, rsi\n  mov rsi, rdi\n  mov eax, 1\n  mov edi, 1\n  syscall\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "putcs:\n  mov rsi, rdi\n  mov rdx, -1\n.putcs_loop:\n  cmp BYTE [rsi+rdx+1], 0\n  lea rdx, [rdx+1]\n  jne .putcs_loop\n  mov eax, 1\n  mov edi, 1\n  syscall\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "putc:\n  push rdi\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea rsi, [rsp]\n  mov rdx, 1\n  syscall\n  pop rax\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "puti:\n  mov rcx, rdi\n  sub rsp, 40\n  mov r10, rdi\n  mov r11, -3689348814741910323\n  neg rcx\n  cmovs rcx, rdi\n  mov edi, 22-1\n.puti_loop:\n  mov rax, rcx\n  movsx r9, dil\n  mul r11\n  movsx r8, r9b\n  lea edi, [r9-1]\n  mov rsi, r9\n  shr rdx, 3\n  lea rax, [rdx+rdx*4]\n  add rax, rax\n  sub rcx, rax\n  add ecx, 48\n  mov BYTE [rsp+r8], cl\n  mov rcx, rdx\n  test rdx, rdx\n  jne .puti_loop\n  test r10, r10\n  jns .puti_done\n  movsx rax, dil\n  movsx r9d, dil\n  movsx rsi, dil\n  mov BYTE [rsp+rax], 45\n.puti_done:\n  mov rax, 1 ; sys_write\n  mov rdi, 1 ; stdout\n  lea r10, [rsp+rsi]\n  mov rsi, r10\n  mov rdx, 22\n  sub edx, r9d\n  syscall\n  add rsp, 40\n  ret\n");
+        fwWriteChunkOrCrash(&asmWriter, "putf:\n  push rbp\n  cvttsd2si rbp, xmm0\n  push rbx\n  mov rbx, rdi\n  sub rsp, 72\n  mov rdi, rbp\n  movsd QWORD [rsp+8], xmm0\n  call puti\n  movsd xmm0, QWORD [rsp+8]\n  pxor xmm1, xmm1\n  comisd xmm1, xmm0\n  jbe .putf_pos\n  mov r8, 0x8000000000000000\n  mov QWORD [rsp], r8\n  movsd xmm1, QWORD [rsp]\n  xorpd xmm0, xmm1\n  cvttsd2si rbp, xmm0\n.putf_pos:\n  pxor xmm1, xmm1\n  mov BYTE [rsp+16], 46\n  cvtsi2sd xmm1, rbp\n  subsd xmm0, xmm1\n  test rbx, rbx\n  je .putf_single\n  lea rax, [rsp+17]\n  mov r8, 0x4024000000000000\n  mov QWORD [rsp], r8\n  movsd xmm2, QWORD [rsp]\n  lea rdi, [rax+rbx]\n.putf_loop:\n  mulsd xmm0, xmm2\n  pxor xmm1, xmm1\n  add rax, 1\n  cvttsd2si rdx, xmm0\n  cvtsi2sd xmm1, rdx\n  lea ecx, [rdx+48]\n  mov BYTE [rax-1], cl\n  subsd xmm0, xmm1\n  cmp rdi, rax\n  jne .putf_loop\n  lea rdx, [rbx+1]\n.putf_done:\n  lea rsi, [rsp+16]\n  mov rax, 1\n  mov rdi, 1\n  syscall\n  add rsp, 72\n  pop rbx\n  pop rbp\n  ret\n.putf_single:\n  mov edx, 1\n  jmp .putf_done\n");
+        fwWriteChunkOrCrash(&asmWriter, "memcp:\n  test rdx, rdx\n  je .memcp_done\n  mov eax, 0\n.memcp_loop:\n  movzx ecx, BYTE [rsi+rax]\n  mov BYTE [rdi+rax], cl\n  add rax, 1\n  cmp rdx, rax\n  jne .memcp_loop\n.memcp_done:\n  ret\n");
+    }
 
     // entry point
     fwWriteChunkOrCrash(&asmWriter, "_start:\n");
+    
+    // prepare stack
     fwWriteChunkOrCrash(&asmWriter, "  push rbp\n");
     fwWriteChunkOrCrash(&asmWriter, "  mov rbp, rsp\n");
+    // TODO: make this constant depend on the current stack frame
     // this will matter when implementing subroutines
-    // fwWriteChunkOrCrash(&asmWriter, "  sub rsp, 65535\n");
+    fwWriteChunkOrCrash(&asmWriter, "  mov rax, %d\n", 1<<23);
+    if (target == TARGET_WINDOWS) {
+        // this is important otherwise you will get memory access violation
+	    fwWriteChunkOrCrash(&asmWriter, "  call __chkstk\n");
+    }
+    else if (target == TARGET_LINUX) {
+    }
+    // fwWriteChunkOrCrash(&asmWriter, "  sub rsp, rax\n");
+
 
     HashMap symbolTable = hmNew(256);
     generateStatements(program->right, &symbolTable, &asmWriter);
     hmFree(symbolTable);
 
     // clean up and exit
-    fwWriteChunkOrCrash(&asmWriter, "  leave\n");
-    fwWriteChunkOrCrash(&asmWriter, "  mov rax, 60\n");
-    fwWriteChunkOrCrash(&asmWriter, "  xor rdi, rdi\n");
-    fwWriteChunkOrCrash(&asmWriter, "  syscall\n");
+    // fwWriteChunkOrCrash(&asmWriter, "  leave\n");
+    if (target == TARGET_WINDOWS) {
+        fwWriteChunkOrCrash(&asmWriter, "  xor rcx, rcx\n");
+        fwWriteChunkOrCrash(&asmWriter, "  call ExitProcess\n");
+    }
+    else if (target == TARGET_LINUX) {
+        fwWriteChunkOrCrash(&asmWriter, "  mov rax, 60\n");
+        fwWriteChunkOrCrash(&asmWriter, "  xor rdi, rdi\n");
+        fwWriteChunkOrCrash(&asmWriter, "  syscall\n");
+    }
     // data section (strings)
     fwWriteChunkOrCrash(&asmWriter, "section .data\n");
 
@@ -208,13 +240,14 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
         if (hasSubscript) {
             arrSize = svParseI64(subscript->token.text);
         }
+        assert(arrSize >= 0);
 
         // TODO: clean this up
         Token typeName = typeNode->token;
         TypeKind assignTypeKind = svCmp(svFromCStr("u8"), typeName.text) == 0 ? TYPE_U8 :
                                 svCmp(svFromCStr("i64"), typeName.text) == 0 ? TYPE_I64 : TYPE_F64;
         
-        size_t offset = typeKindSize(assignTypeKind) * (arrSize == 0 ? 1 : arrSize);
+        size_t offset = (size_t)(typeKindSize(assignTypeKind) * (arrSize == 0 ? 1 : arrSize));
         offset += 8 - ((rspOffset-1) & (8-1)) - 1;
         rspOffset += offset;
         fwWriteChunkOrCrash(asmWriter, "  ; NODE_DEFINITION "SV_FMT" has offset %d\n", SV_ARG(id.text), rspOffset);
@@ -224,7 +257,7 @@ void generateStatement(AST* wrapper, HashMap* symbolTable, FileWriter* asmWriter
             .val = {
                 .type = {
                     .kind = assignTypeKind,
-                    .size = arrSize
+                    .size = (size_t) arrSize
                 },
                 .offset = rspOffset
             }

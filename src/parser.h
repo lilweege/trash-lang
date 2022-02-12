@@ -61,8 +61,8 @@ void printAST(AST* root, size_t depth);
 // (hopefully when I revisit this it's not completely unintelligible)
 // TODO: bit arithmetic, pointers, arrays (strings will be u8 arrays), square bracket operator
 
-// program         ->  { subroutine | statement }
-// subroutine      ->  type identifier ( [ type identifier { , type identifier } ] ) block
+// program         ->  { procedure | statement }
+// procedure       ->  type identifier ( [ type identifier { , type identifier } ] ) block
 // statement       ->  branch | definition | assignment | expression ;
 // branch          ->  while-branch | if-branch
 // while-branch    ->  "while" ( expression ) block | statement
@@ -99,7 +99,7 @@ void printAST(AST* root, size_t depth);
 
 
 AST* parseProgram(Tokenizer* tokenizer);
-AST* parseSubroutine(Tokenizer* tokenizer);
+AST* parseProcedure(Tokenizer* tokenizer);
 AST* parseStatement(Tokenizer* tokenizer);
 AST* parseBranch(Tokenizer* tokenizer);
 AST* parseBlock(Tokenizer* tokenizer);

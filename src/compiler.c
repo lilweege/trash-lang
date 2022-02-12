@@ -119,14 +119,21 @@ void execAndEcho(const char* command) {
     exit(1);
 }
 
-void compileFile(char* filename) {
-#ifdef WINDOWS
-    (void) filename;
-    fprintf(stderr, "ERROR: Compilation is not currently supported on windows.\n");
-#else
-
 #define SRC_PATH_MAX 256
 #define TMP_BUF_SZ (2 * SRC_PATH_MAX + 128)
+void compileFile(char* filename) {
+    Target compilationTarget;
+#ifdef WINDOWS
+    compilationTarget = TARGET_WINDOWS;
+#else
+    compilationTarget = TARGET_LINUX;
+#endif
+
+    if (compilationTarget == TARGET_WINDOWS) {
+        fprintf(stderr, "ERROR: Compilation is not currently supported on windows.\n");
+        exit(1);
+    }
+
     static char cmdBuf[TMP_BUF_SZ];
     
     // read file
@@ -178,40 +185,40 @@ void compileFile(char* filename) {
     
     // generate the program
     char* asmFilename = outputFilename + pathEndIdx;
-    generateProgram(asmFilename, program);
+    generateProgram(asmFilename, program, compilationTarget);
     free(fileContent);
     printf("INFO: generated %s\n", asmFilename);
     
     const int basenameLen = (int)(pathnameLen - pathEndIdx);
     printf("EXEC: ");
-#ifdef WINDOWS
-    snprintf(cmdBuf, TMP_BUF_SZ, "nasm -fwin64 \"%.*s.asm\"",
-             basenameLen, asmFilename);
-#else
-    snprintf(cmdBuf, TMP_BUF_SZ, "nasm -felf64 \"%.*s.asm\"",
-             basenameLen, asmFilename);
-#endif
+    if (compilationTarget == TARGET_WINDOWS) {
+        snprintf(cmdBuf, TMP_BUF_SZ, "nasm -fwin64 \"%.*s.asm\"",
+                 basenameLen, asmFilename);
+    }
+    else if (compilationTarget == TARGET_LINUX) {
+        snprintf(cmdBuf, TMP_BUF_SZ, "nasm -felf64 \"%.*s.asm\"",
+                 basenameLen, asmFilename);
+    }
     execAndEcho(cmdBuf);
 
 
     printf("EXEC: ");
-#ifdef WINDOWS
-    // msvc
-    snprintf(cmdBuf, TMP_BUF_SZ, "link /nologo /nodefaultlib /subsystem:console /entry:_start \"%.*s.obj\" kernel32.lib",
-             basenameLen, asmFilename);
-#else
-    // gnu
-    snprintf(cmdBuf, TMP_BUF_SZ, "ld -o \"%.*s.out\" \"%.*s.o\"",
-             basenameLen, asmFilename,
-             basenameLen, asmFilename);
-#endif
+    if (compilationTarget == TARGET_WINDOWS) {
+        // msvc link
+        snprintf(cmdBuf, TMP_BUF_SZ, "link /nologo /nodefaultlib /entry:_start /subsystem:console /stack:10000000 \"%.*s.obj\" kernel32.lib msvcrt.lib",
+                 basenameLen, asmFilename);
+    }
+    else if (compilationTarget == TARGET_LINUX) {
+        // gnu ld
+        snprintf(cmdBuf, TMP_BUF_SZ, "ld -o \"%.*s.out\" \"%.*s.o\"",
+                 basenameLen, asmFilename,
+                 basenameLen, asmFilename);
+    }
     execAndEcho(cmdBuf);
 
-
+}
 #undef SRC_PATH_MAX
 #undef TMP_BUF_SZ
-#endif
-}
 
 void simulateFile(char* filename) {
     size_t fileSize;

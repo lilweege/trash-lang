@@ -32,8 +32,8 @@ bool fwGrow(FileWriter* fw) {
 }
 
 
-void fwWriteChunkOrCrash(FileWriter* fw, char* fmt, ...) {
 #define TMP_BUF_SZ 1024
+void fwWriteChunkOrCrash(FileWriter* fw, char* fmt, ...) {
     static char tmpBuf[TMP_BUF_SZ];
 
     while (fw->size + TMP_BUF_SZ >= fw->cap) {
@@ -53,8 +53,8 @@ void fwWriteChunkOrCrash(FileWriter* fw, char* fmt, ...) {
     memcpy(fw->data+fw->size, tmpBuf, numBytes);
     fw->size += numBytes;
     // return true;
-#undef TMP_BUF_SZ
 }
+#undef TMP_BUF_SZ
 
 void readFileOrCrash(const char* filename, size_t* outSize, char** outBuff) {
     int res = readFile(filename, outSize, outBuff);

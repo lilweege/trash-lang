@@ -279,23 +279,6 @@ void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
     }
 }
 
-Type checkCall(const char* filename, AST* call, HashMap* symbolTable) {
-    // TODO: user defined subroutines
-    assert(call != NULL);
-    
-    AST* args = call->left; assert(args != NULL);
-    Type argTypes[MAX_FUNC_ARGS];
-    size_t numArgs = 0;
-
-    for (AST* curArg = args;
-         curArg->right != NULL;
-         curArg = curArg->right)
-    {
-        assert(numArgs < MAX_FUNC_ARGS - 1);
-        AST* toCheck = curArg->left;
-        argTypes[numArgs++] = checkExpression(filename, toCheck, symbolTable);
-    }
-
 
 #define expectNumArgs(expected) do {                                                                      \
         if (numArgs != expected) {                                                                        \
@@ -326,7 +309,22 @@ Type checkCall(const char* filename, AST* call, HashMap* symbolTable) {
                      typeKindKeyword(expectedKind), \
                      typeKindKeyword(argTypes[position].kind)); \
     } while (0)
+Type checkCall(const char* filename, AST* call, HashMap* symbolTable) {
+    // TODO: user defined subroutines
+    assert(call != NULL);
+    
+    AST* args = call->left; assert(args != NULL);
+    Type argTypes[MAX_FUNC_ARGS];
+    size_t numArgs = 0;
 
+    for (AST* curArg = args;
+         curArg->right != NULL;
+         curArg = curArg->right)
+    {
+        assert(numArgs < MAX_FUNC_ARGS - 1);
+        AST* toCheck = curArg->left;
+        argTypes[numArgs++] = checkExpression(filename, toCheck, symbolTable);
+    }
 
     // built in functions
     if (svCmp(svFromCStr("puti"), call->token.text) == 0) {
@@ -397,10 +395,10 @@ Type checkCall(const char* filename, AST* call, HashMap* symbolTable) {
                     SV_ARG(call->token.text));
 
     return (Type) { 0 }; // unreachable
+}
 #undef expectNumArgs
 #undef argMatch
 #undef positionalArgFail
-}
 
 Type checkExpression(const char* filename, AST* expression, HashMap* symbolTable) {
     assert(expression != NULL);

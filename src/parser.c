@@ -82,7 +82,10 @@ AST* parseProgram(Tokenizer* tokenizer) {
     AST* curr = resultTree->right;
 
     while (1) {
-        AST* statement = parseStatement(tokenizer);
+        AST* statement = parseProcedure(tokenizer);
+        if (statement == NULL) {
+            statement = parseStatement(tokenizer);
+        }
         if (statement == NULL) {
             break;
         }
@@ -93,6 +96,12 @@ AST* parseProgram(Tokenizer* tokenizer) {
     }
     // printAST(resultTree, 0);
     return resultTree;
+}
+
+AST* parseProcedure(Tokenizer* tokenizer) {
+    // TODO
+    (void) tokenizer;
+    return NULL;
 }
 
 #define expectSemicolon(tokenizer, token) do { \

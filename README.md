@@ -15,7 +15,7 @@ My first programming language written from scratch in C
 - [x] Arrays
   - [ ] Constexpr-length arrays
   - [ ] Variable-length arrays
-- [ ] User-defined subroutines
+- [ ] User-defined procedures
 - [ ] User-defined structures
 - [x] Write to `stdout`
 - [ ] Read from `stdin`
@@ -23,7 +23,7 @@ My first programming language written from scratch in C
 
 ## Quick Start
 
-#### Unix / WSL2
+#### Linux / WSL2
 
 ##### Compilation
 
