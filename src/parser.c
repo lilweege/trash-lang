@@ -6,8 +6,8 @@
 #include <assert.h>
 
 const char* nodeKindName(NodeKind kind) {
-    static_assert(NODE_COUNT == 31, "Exhaustive check of node kinds failed");
-    const char* NodeKindNames[31] = {
+    static_assert(NODE_COUNT == 32, "Exhaustive check of node kinds failed");
+    const char* NodeKindNames[32] = {
         "NODE_PROGRAM",
         "NODE_IF",
         "NODE_ELSE",
@@ -15,6 +15,7 @@ const char* nodeKindName(NodeKind kind) {
         "NODE_BLOCK",
         "NODE_STATEMENT",
         "NODE_CALL",
+        "NODE_PROCEDURE",
         "NODE_DEFINITION",
         "NODE_ARGUMENT",
         "NODE_TYPE",
@@ -86,6 +87,8 @@ AST* parseProgram(Tokenizer* tokenizer) {
         if (statement == NULL) {
             statement = parseStatement(tokenizer);
         }
+        
+        // AST* statement = parseStatement(tokenizer);
         if (statement == NULL) {
             break;
         }
@@ -94,14 +97,107 @@ AST* parseProgram(Tokenizer* tokenizer) {
         curr->left = statement;
         curr = curr->right;
     }
-    // printAST(resultTree, 0);
+    printAST(resultTree, 0);
     return resultTree;
 }
 
-AST* parseProcedure(Tokenizer* tokenizer) {
+// procedure       ->  type identifier ( [ type identifier { , type identifier } ] ) block
+AST* parseProcedure(Tokenizer* original) {
+    // return NULL;
+    Tokenizer current = *original;
+    Tokenizer* tokenizer = &current;
+
+    printf("PARSING PROC\n");
+    AST* type = parseType(tokenizer);
+    if (type == NULL) return NULL;
+    printf("PARSING PROC: GOT TYPE\n");
+    if (!pollToken(tokenizer)) {
+        return NULL;
+        // compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
+        //              "Unexpected end of file");
+    }
+    if (tokenizer->nextToken.kind != TOKEN_IDENTIFIER) {
+        return NULL;
+    }
+    Token id = tokenizer->nextToken;
+    tokenizer->nextToken.kind = TOKEN_NONE;
+    printf("PARSING PROC: GOT NAME\n");
+    if (!pollToken(tokenizer)) {
+        return NULL;
+    }
+    if (tokenizer->nextToken.kind != TOKEN_LPAREN) {
+        return NULL;
+    }
+    tokenizer->nextToken.kind = TOKEN_NONE;
+    
+    // it is a procedure
+    AST* proc = newNode(NODE_PROCEDURE, id);
+    
     // TODO
-    (void) tokenizer;
-    return NULL;
+    printf("======\t\tPARSE PROC\t\t======\n");
+    printf("[%s]: <%s: \""SV_FMT"\">\n", nodeKindName(proc->kind), tokenKindName(proc->token.kind), SV_ARG(proc->token.text));
+
+    AST* firstParam = parseDefinition(tokenizer);
+
+    if (firstParam == NULL) {
+        assert(pollToken(tokenizer));
+        if (tokenizer->nextToken.kind == TOKEN_RPAREN) {
+            tokenizer->nextToken.kind = TOKEN_NONE;
+            proc->right = parseBlock(tokenizer);
+            *original = current;
+            printf("DONE PARSING BLOCK\n");
+            return proc;
+        }
+        else {
+            compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
+                        "Invalid parameter");
+        }
+    }
+    printf("PROC: FIRST PARAM\n");
+
+    //         Procedure
+    //         /      |
+    //     Defn    Block
+    //     / |
+    // Type  Defn
+    //     / |
+    // Type  Defn
+    //    ...
+
+    proc->left = firstParam;
+    AST* curr = proc->left;
+
+    // curr->right = newNode(NODE_ARGUMENT, (Token){0});
+    // curr->left = firstArg;
+    // curr = curr->right;
+
+    while (1) {
+        if (!pollToken(tokenizer)) {
+            compileError((FileInfo) { tokenizer->filename, proc->token.pos },
+                        "Unmatched token");
+        }
+        if (tokenizer->nextToken.kind == TOKEN_RPAREN) {
+            tokenizer->nextToken.kind = TOKEN_NONE;
+            break;
+        }
+        if (tokenizer->nextToken.kind == TOKEN_OPERATOR_COMMA) {
+            tokenizer->nextToken.kind = TOKEN_NONE;
+            curr->right = parseDefinition(tokenizer);
+            if (curr->right == NULL) {
+                compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
+                            "Invalid argument");
+            }
+            curr = curr->right;
+        }
+        else {
+            compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
+                        "Expected comma separator");
+        }
+    }
+    
+    proc->right = parseBlock(tokenizer);
+    *original = current;
+    return proc;
 }
 
 #define expectSemicolon(tokenizer, token) do { \
@@ -117,6 +213,9 @@ AST* parseStatement(Tokenizer* tokenizer) {
     AST* result = parseBranch(tokenizer);
     if (result == NULL) {
         result = parseDefinition(tokenizer);
+        if (result != NULL) {
+            expectSemicolon(tokenizer, result->token);
+        }
     }
     if (result == NULL) {
         result = parseAssignment(tokenizer);
@@ -269,11 +368,11 @@ AST* parseDefinition(Tokenizer* tokenizer) {
     }
     if (tokenizer->nextToken.kind != TOKEN_IDENTIFIER) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
-                     "Invalid definition, expected identifier");
+                     "Expected identifier after type");
     }
     AST* defn = newNode(NODE_DEFINITION, tokenizer->nextToken);
     tokenizer->nextToken.kind = TOKEN_NONE;
-    expectSemicolon(tokenizer, defn->token);
+    // expectSemicolon(tokenizer, defn->token);
     defn->left = type;
     return defn;
 }
@@ -619,8 +718,9 @@ AST* parseLvalue(Tokenizer* tokenizer) {
 // equivalent to above function
 AST* parseType(Tokenizer* tokenizer) {
     if (!pollToken(tokenizer)) {
-        compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
-                    "Unexpected end of file");
+        return NULL;
+        // compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
+        //             "Unexpected end of file (PARSE TYPE)");
     }
     if (tokenizer->nextToken.kind != TOKEN_TYPE) return NULL;
 

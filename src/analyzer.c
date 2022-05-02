@@ -122,6 +122,7 @@ void verifyProgram(const char* filename, AST* program) {
 
 void verifyStatements(const char* filename, AST* statement, HashMap* symbolTable) {
     assert(statement != NULL);
+    printf("VERIFY STATEMENTS [%s]: <%s: \""SV_FMT"\">\n", nodeKindName(statement->kind), tokenKindName(statement->token.kind), SV_ARG(statement->token.text));
     if (statement->right == NULL) {
         return;
     }
@@ -177,57 +178,63 @@ void verifyConditional(const char* filename, AST* statement, HashMap* symbolTabl
 }
 
 
+void verifyDefinition(const char* filename, AST* definition, HashMap* symbolTable) {
+    Token id = definition->token;
+    AST* typeNode = definition->left;
+    assert(typeNode != NULL);
+    AST* subscript = typeNode->left;
+    bool hasSubscript = subscript != NULL;
+    if (hasSubscript) {
+        // defining an array
+
+        // TODO: compile time evaluations of contants ?
+        if (subscript->kind != NODE_INTEGER) {
+            compileError((FileInfo) { filename, subscript->token.pos },
+                            "Array size must be constant");
+        }
+
+        Type sizeExpr = checkExpression(filename, subscript, symbolTable);
+        if (!isScalar(sizeExpr) || !isIntegral(sizeExpr.kind)) {
+            compileError((FileInfo) { filename, subscript->token.pos },
+                            "Array size must be an integal type");
+        }
+    }
+    
+    // TODO: determine type enum value during tokenizing rather than here
+    // this is a wasteful computation
+    Token typeName = typeNode->token;
+    TypeKind assignTypeKind = svCmp(svFromCStr("u8"), typeName.text) == 0 ? TYPE_U8 :
+                            svCmp(svFromCStr("i64"), typeName.text) == 0 ? TYPE_I64 : TYPE_F64;
+    
+    Symbol* var = hmGet(symbolTable, id.text);
+    if (var != NULL) {
+        compileError((FileInfo) { filename, id.pos },
+                        "Redefinition of variable \""SV_FMT"\"",
+                        SV_ARG(id.text));
+    }
+
+    Symbol newVar = (Symbol) {
+        .id = id.text,
+        .val = {
+            .type = {
+                .kind = assignTypeKind,
+                .size = hasSubscript ? 1 : 0
+            },
+        }
+    };
+    hmPut(symbolTable, newVar);
+}
+
+
 void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
     AST* statement = wrapper->left;
     assert(statement != NULL);
+    printf("VERIFY STATEMENT [%s]: <%s: \""SV_FMT"\">\n", nodeKindName(statement->kind), tokenKindName(statement->token.kind), SV_ARG(statement->token.text));
     if (statement->kind == NODE_WHILE || statement->kind == NODE_IF) {
         verifyConditional(filename, wrapper, symbolTable);
     }
     else if (statement->kind == NODE_DEFINITION) {
-        Token id = statement->token;
-        AST* typeNode = statement->left;
-        assert(typeNode != NULL);
-        AST* subscript = typeNode->left;
-        bool hasSubscript = subscript != NULL;
-        if (hasSubscript) {
-            // defining an array
-
-            // TODO: compile time evaluations of contants ?
-            if (subscript->kind != NODE_INTEGER) {
-                compileError((FileInfo) { filename, subscript->token.pos },
-                             "Array size must be constant");
-            }
-
-            Type sizeExpr = checkExpression(filename, subscript, symbolTable);
-            if (!isScalar(sizeExpr) || !isIntegral(sizeExpr.kind)) {
-                compileError((FileInfo) { filename, subscript->token.pos },
-                             "Array size must be an integal type");
-            }
-        }
-        
-        // TODO: determine type enum value during tokenizing rather than here
-        // this is a wasteful computation
-        Token typeName = typeNode->token;
-        TypeKind assignTypeKind = svCmp(svFromCStr("u8"), typeName.text) == 0 ? TYPE_U8 :
-                                svCmp(svFromCStr("i64"), typeName.text) == 0 ? TYPE_I64 : TYPE_F64;
-        
-        Symbol* var = hmGet(symbolTable, id.text);
-        if (var != NULL) {
-            compileError((FileInfo) { filename, id.pos },
-                         "Redefinition of variable \""SV_FMT"\"",
-                         SV_ARG(id.text));
-        }
-
-        Symbol newVar = (Symbol) {
-            .id = id.text,
-            .val = {
-                .type = {
-                    .kind = assignTypeKind,
-                    .size = hasSubscript ? 1 : 0
-                },
-            }
-        };
-        hmPut(symbolTable, newVar);
+        verifyDefinition(filename, statement, symbolTable);
     }
     else if (statement->kind == NODE_ASSIGN) {
         AST* lval = statement->left;
@@ -272,6 +279,23 @@ void verifyStatement(const char* filename, AST* wrapper, HashMap* symbolTable) {
                          typeKindKeyword(lvalType.kind));
         }
         // assignment ok
+    }
+    else if (statement->kind == NODE_PROCEDURE) {
+        AST* body = statement->right;
+        assert(body != NULL);
+        assert(body->kind == NODE_BLOCK);
+        AST* first = body->right;
+        assert(body->right != NULL);
+
+        HashMap scope = hmCopy(*symbolTable);
+        AST* currParam = statement->left;
+        while (currParam != NULL) {
+            verifyDefinition(filename, currParam, &scope);
+            currParam = currParam->right;
+        }
+
+        verifyStatements(filename, first, &scope);
+        hmFree(scope);
     }
     else {
         // everything else
@@ -402,6 +426,7 @@ Type checkCall(const char* filename, AST* call, HashMap* symbolTable) {
 
 Type checkExpression(const char* filename, AST* expression, HashMap* symbolTable) {
     assert(expression != NULL);
+    printf("CHECK EXPRESSION [%s]: <%s: \""SV_FMT"\">\n", nodeKindName(expression->kind), tokenKindName(expression->token.kind), SV_ARG(expression->token.text));
     if (expression->kind == NODE_INTEGER) {
         return (Type) { .kind = TYPE_I64, .size = 0 };
     }

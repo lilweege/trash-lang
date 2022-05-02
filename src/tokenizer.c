@@ -83,7 +83,7 @@ bool pollToken(Tokenizer* tokenizer) {
     } while (lineDiff != 0 || colDiff != 0);
 
     if (tokenizer->source.size == 0) {
-        // printf("POLLED NOTHING\n");
+        printf("POLLED NOTHING\n");
         return false;
     }
 
@@ -323,11 +323,11 @@ bool pollToken(Tokenizer* tokenizer) {
     tokenizer->nextToken.pos.col = tokenizer->curPos.col + 1;
     tokenizer->curPos.col += tokenizer->nextToken.text.size;
 
-    // printf("POLLED TOKEN <%s:%zu:%zu: \""SV_FMT"\">\n",
-    //         tokenKindName(tokenizer->nextToken.kind),
-    //         tokenizer->nextToken.pos.line+1,
-    //         tokenizer->nextToken.pos.col+1,
-    //         SV_ARG(tokenizer->nextToken.text));
+    printf("POLLED TOKEN <%s:%zu:%zu: \""SV_FMT"\">\n",
+            tokenKindName(tokenizer->nextToken.kind),
+            tokenizer->nextToken.pos.line+1,
+            tokenizer->nextToken.pos.col+1,
+            SV_ARG(tokenizer->nextToken.text));
     return true;
 }
 

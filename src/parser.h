@@ -11,6 +11,7 @@ typedef enum {
     NODE_BLOCK,
     NODE_STATEMENT,
     NODE_CALL,
+    NODE_PROCEDURE,
     NODE_DEFINITION,
     NODE_ARGUMENT,
     NODE_TYPE,
