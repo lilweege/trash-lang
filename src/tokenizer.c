@@ -352,8 +352,9 @@ TokenizerResult pollToken(Tokenizer* tokenizer) {
                 }
             }
             else {
-                fprintf(stderr, "ERROR: Unhandled character %d: '%c'\n", curChar, curChar);
-                exit(1);
+                TOKEN_UNIMPLEMENTED("OTHER");
+                // fprintf(stderr, "ERROR: Unhandled character %d: '%c'\n", curChar, curChar);
+                // exit(1);
             }
         }
     }
