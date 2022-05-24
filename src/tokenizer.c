@@ -7,9 +7,10 @@
 #include <stdarg.h>
 
 const char* tokenKindName(TokenKind kind) {
-    static_assert(TOKEN_COUNT == 33, "Exhaustive check of token kinds failed");
-    const char* TokenKindNames[33] = {
+    static_assert(TOKEN_COUNT == 34, "Exhaustive check of token kinds failed");
+    const char* TokenKindNames[34] = {
         "TOKEN_NONE",
+        "TOKEN_COMMENT",
         "TOKEN_SEMICOLON",
         "TOKEN_IDENTIFIER",
         "TOKEN_IF",
@@ -47,6 +48,22 @@ const char* tokenKindName(TokenKind kind) {
 }
 
 
+
+TokenizerResult pollToken(Tokenizer* tokenizer) {
+    TokenizerResult res;
+
+    res = pollTokenWithComments(tokenizer);
+    if (res.err != TOKENIZER_ERROR_NONE)
+        return res;
+    while (tokenizer->nextToken.kind == TOKEN_COMMENT) {
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        res = pollTokenWithComments(tokenizer);
+        if (res.err != TOKENIZER_ERROR_NONE)
+            return res;
+    }
+    return res;
+}
+
 #define TOKEN_UNIMPLEMENTED(token) \
     return (TokenizerResult) {                                  \
         .err = TOKENIZER_ERROR_FAIL,                            \
@@ -59,11 +76,12 @@ const char* tokenKindName(TokenKind kind) {
             },                                                  \
         .msg = token" not implemented yet" }
 
-TokenizerResult pollToken(Tokenizer* tokenizer) {
+TokenizerResult pollTokenWithComments(Tokenizer* tokenizer) {
     if (tokenizer->nextToken.kind != TOKEN_NONE) {
         return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
     }
 
+    bool isComment = false;
     size_t lineDiff, colDiff;
     do {
         // whitespace
@@ -78,12 +96,16 @@ TokenizerResult pollToken(Tokenizer* tokenizer) {
         }
         char curChar = *tokenizer->source.data;
         if (curChar == '?') {
+            // it is a comment
+            isComment = true;
             size_t commentEnd = 0;
             if (!svFirstIndexOfChar(tokenizer->source, '\n', &commentEnd)) {
                 svLeftChop(&tokenizer->source, tokenizer->source.size);
                 break;
             }
-            svLeftChop(&tokenizer->source, commentEnd+1);
+            
+            tokenizer->nextToken.kind = TOKEN_COMMENT;
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, commentEnd+1);
             tokenizer->curPos.line++;
             tokenizer->curPos.col = 0;
         }
@@ -91,6 +113,11 @@ TokenizerResult pollToken(Tokenizer* tokenizer) {
         lineDiff = tokenizer->curPos.line - linesBefore;
         colDiff = tokenizer->curPos.col - colsBefore;
     } while (lineDiff != 0 || colDiff != 0);
+
+    if (isComment) {
+        return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
+    }
+
 
     if (tokenizer->source.size == 0) {
         // printf("POLLED NOTHING\n");

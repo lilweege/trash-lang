@@ -7,6 +7,7 @@
 
 typedef enum {
     TOKEN_NONE,
+    TOKEN_COMMENT,
     TOKEN_SEMICOLON,
     TOKEN_IDENTIFIER,
     TOKEN_IF,
@@ -71,5 +72,6 @@ typedef struct {
 } TokenizerResult;
 
 TokenizerResult pollToken(Tokenizer* tokenizer);
+TokenizerResult pollTokenWithComments(Tokenizer* tokenizer);
 
 #endif // TOKENIZER_H
