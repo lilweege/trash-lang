@@ -47,6 +47,18 @@ const char* tokenKindName(TokenKind kind) {
 }
 
 
+#define TOKEN_UNIMPLEMENTED(token) \
+    return (TokenizerResult) {                                  \
+        .err = TOKENIZER_ERROR_FAIL,                            \
+            .info = {                                           \
+                .filename = tokenizer->filename,                \
+                .location = {                                   \
+                    .line = tokenizer->nextToken.pos.line + 1,  \
+                    .col = tokenizer->nextToken.pos.col + 1,    \
+                }                                               \
+            },                                                  \
+        .msg = token" not implemented yet" }
+
 TokenizerResult pollToken(Tokenizer* tokenizer) {
     if (tokenizer->nextToken.kind != TOKEN_NONE) {
         return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
@@ -182,7 +194,7 @@ TokenizerResult pollToken(Tokenizer* tokenizer) {
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
             }
             else {
-                assert(0 && "&? not implemented yet");
+                TOKEN_UNIMPLEMENTED("&?");
             }
         } break;
 
@@ -192,7 +204,7 @@ TokenizerResult pollToken(Tokenizer* tokenizer) {
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
             }
             else {
-                assert(0 && "|? not implemented yet");
+                TOKEN_UNIMPLEMENTED("|?");
             }
         } break;
 
@@ -300,8 +312,8 @@ TokenizerResult pollToken(Tokenizer* tokenizer) {
             svLeftChop(&tokenizer->source, 1); // close quote
         } break;
 
-        case '\\': assert(0 && "char \\ not implemented yet"); break;
-        case '.': assert(0 && "char . not implemented yet"); break;
+        case '\\': TOKEN_UNIMPLEMENTED("\\"); break;
+        case '.': TOKEN_UNIMPLEMENTED("."); break;
         // TODO: other operators and combinations
 
         default: {
@@ -359,3 +371,4 @@ TokenizerResult pollToken(Tokenizer* tokenizer) {
     return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
 }
 
+#undef TOKEN_UNIMPLEMENTED
