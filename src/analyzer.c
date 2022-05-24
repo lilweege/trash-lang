@@ -1,5 +1,6 @@
 #include "analyzer.h"
 #include "compiler.h"
+#include "compileerror.h"
 
 #include <stdio.h>
 #include <assert.h>

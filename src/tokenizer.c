@@ -1,5 +1,4 @@
 #include "tokenizer.h"
-#include "compiler.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,10 +47,9 @@ const char* tokenKindName(TokenKind kind) {
 }
 
 
-// consumed token == true
-bool pollToken(Tokenizer* tokenizer) {
+TokenizerResult pollToken(Tokenizer* tokenizer) {
     if (tokenizer->nextToken.kind != TOKEN_NONE) {
-        return true;
+        return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
     }
 
     size_t lineDiff, colDiff;
@@ -84,7 +82,7 @@ bool pollToken(Tokenizer* tokenizer) {
 
     if (tokenizer->source.size == 0) {
         printf("POLLED NOTHING\n");
-        return false;
+        return (TokenizerResult){.err=TOKENIZER_ERROR_EMPTY};
     }
 
     char curChar = *tokenizer->source.data;
@@ -231,10 +229,17 @@ bool pollToken(Tokenizer* tokenizer) {
                     break;
                 }
                 if (tokenizer->source.data[idx] == '\n') {
-                    compileErrorAt(tokenizer->filename,
-                                   tokenizer->curPos.line + 1,
-                                   tokenizer->curPos.col + idx + 1,
-                                   "Unexpected end of line in string literal");
+                    return (TokenizerResult) {
+                        .err = TOKENIZER_ERROR_FAIL,
+                        .info = {
+                            .filename = tokenizer->filename,
+                            .location = {
+                                .line = tokenizer->curPos.line + 1,
+                                .col = tokenizer->curPos.col + idx + 1,
+                            }
+                        },
+                        .msg = "Unexpected end of line in string literal"
+                    };
                 }
                 if (tokenizer->source.data[idx] == '\\') {
                     ++idx;
@@ -243,30 +248,53 @@ bool pollToken(Tokenizer* tokenizer) {
                     }
                     char escapeChar = tokenizer->source.data[idx];
                     if (escapeChar != delim && escapeChar != '\n' &&
-                            escapeChar != 'n' && escapeChar != 't' && escapeChar != '\\') {
-                        compileErrorAt(tokenizer->filename,
-                                       tokenizer->curPos.line + 1,
-                                       tokenizer->curPos.col + idx + 1,
-                                       "Invalid escape sequence '\\%c'", escapeChar);
+                        escapeChar != 'n' && escapeChar != 't' && escapeChar != '\\')
+                    {
+                        return (TokenizerResult) {
+                            .err = TOKENIZER_ERROR_FAIL,
+                            .info = {
+                                .filename = tokenizer->filename,
+                                .location = {
+                                    .line = tokenizer->curPos.line + 1,
+                                    .col = tokenizer->curPos.col + idx + 1,
+                                }
+                            },
+                            .msg = "Invalid escape sequence"
+                        };
                     }
                 }
             }
             if (idx >= tokenizer->source.size) {
-                compileErrorAt(tokenizer->filename,
-                               tokenizer->curPos.line + 1,
-                               tokenizer->curPos.col + idx + 1,
-                               "Unexpected end of file in string literal");
+                return (TokenizerResult) {
+                    .err = TOKENIZER_ERROR_FAIL,
+                    .info = {
+                        .filename = tokenizer->filename,
+                        .location = {
+                            .line = tokenizer->curPos.line + 1,
+                            .col = tokenizer->curPos.col + idx + 1,
+                        }
+                    },
+                    .msg = "Unexpected end of file in string literal"
+                };
             }
             tokenizer->curPos.col += 2; // quotes are not included in string literal token
             tokenizer->nextToken.kind = delim == '"' ? TOKEN_STRING_LITERAL : TOKEN_CHAR_LITERAL;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
             if (tokenizer->nextToken.kind == TOKEN_CHAR_LITERAL) {
                 if ((tokenizer->nextToken.text.size == 2 && tokenizer->nextToken.text.data[0] != '\\') ||
-                        tokenizer->nextToken.text.size > 2) {
-                    compileErrorAt(tokenizer->filename,
-                                   tokenizer->nextToken.pos.line,
-                                   tokenizer->nextToken.pos.col + 1,
-                                   "Max length of character literal exceeded");
+                    tokenizer->nextToken.text.size > 2)
+                {
+                    return (TokenizerResult) {
+                        .err = TOKENIZER_ERROR_FAIL,
+                        .info = {
+                            .filename = tokenizer->filename,
+                            .location = {
+                                .line = tokenizer->nextToken.pos.line,
+                                .col = tokenizer->nextToken.pos.col + 1,
+                            }
+                        },
+                        .msg = "Max length of character literal exceeded"
+                    };
                 }
             }
             svLeftChop(&tokenizer->source, 1); // close quote
@@ -328,6 +356,6 @@ bool pollToken(Tokenizer* tokenizer) {
             tokenizer->nextToken.pos.line+1,
             tokenizer->nextToken.pos.col+1,
             SV_ARG(tokenizer->nextToken.text));
-    return true;
+    return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
 }
 

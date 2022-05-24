@@ -3,6 +3,8 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 
 size_t stackSize;

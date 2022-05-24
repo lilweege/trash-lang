@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "parser.h"
+#include "compileerror.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -58,6 +59,13 @@ AST* newNode(NodeKind kind, Token token) {
     return node;
 }
 
+bool tokenizeOK(TokenizerResult result) {
+    if (result.err == TOKENIZER_ERROR_NONE) return true;
+    if (result.err == TOKENIZER_ERROR_EMPTY) return false;
+    if (result.err == TOKENIZER_ERROR_FAIL)
+        compileError(result.info, result.msg);    
+    assert(0 && "Unreachable");
+}
 
 void printAST(AST* root, size_t depth) {
     if (root == NULL) return;
@@ -77,7 +85,7 @@ void printAST(AST* root, size_t depth) {
 // TODO: fix leaks
 
 AST* parseProgram(Tokenizer* tokenizer) {
-    pollToken(tokenizer);
+    tokenizeOK(pollToken(tokenizer));
     AST* resultTree = newNode(NODE_PROGRAM, (Token){0});
     resultTree->right = newNode(NODE_STATEMENT, (Token){0});
     AST* curr = resultTree->right;
@@ -111,7 +119,7 @@ AST* parseProcedure(Tokenizer* original) {
     AST* type = parseType(tokenizer);
     if (type == NULL) return NULL;
     printf("PARSING PROC: GOT TYPE\n");
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         return NULL;
         // compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
         //              "Unexpected end of file");
@@ -122,7 +130,7 @@ AST* parseProcedure(Tokenizer* original) {
     Token id = tokenizer->nextToken;
     tokenizer->nextToken.kind = TOKEN_NONE;
     printf("PARSING PROC: GOT NAME\n");
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         return NULL;
     }
     if (tokenizer->nextToken.kind != TOKEN_LPAREN) {
@@ -140,7 +148,7 @@ AST* parseProcedure(Tokenizer* original) {
     AST* firstParam = parseDefinition(tokenizer);
 
     if (firstParam == NULL) {
-        assert(pollToken(tokenizer));
+        assert(tokenizeOK(pollToken(tokenizer)));
         if (tokenizer->nextToken.kind == TOKEN_RPAREN) {
             tokenizer->nextToken.kind = TOKEN_NONE;
             proc->right = parseBlock(tokenizer);
@@ -172,7 +180,7 @@ AST* parseProcedure(Tokenizer* original) {
     // curr = curr->right;
 
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, proc->token.pos },
                         "Unmatched token");
         }
@@ -201,7 +209,7 @@ AST* parseProcedure(Tokenizer* original) {
 }
 
 #define expectSemicolon(tokenizer, token) do { \
-    if (!pollToken(tokenizer) || tokenizer->nextToken.kind != TOKEN_SEMICOLON) { \
+    if (!tokenizeOK(pollToken(tokenizer)) || tokenizer->nextToken.kind != TOKEN_SEMICOLON) { \
         compileError((FileInfo) { tokenizer->filename, token.pos }, \
                      "Expected semicolon after token"); \
     } \
@@ -209,7 +217,7 @@ AST* parseProcedure(Tokenizer* original) {
 } while (0)
 
 AST* parseStatement(Tokenizer* tokenizer) {
-    if (!pollToken(tokenizer)) return NULL;
+    if (!tokenizeOK(pollToken(tokenizer))) return NULL;
     AST* result = parseBranch(tokenizer);
     if (result == NULL) {
         result = parseDefinition(tokenizer);
@@ -235,7 +243,7 @@ AST* parseStatement(Tokenizer* tokenizer) {
 }
 
 AST* parseBranch(Tokenizer* tokenizer) {
-    if (!pollToken(tokenizer)) return NULL;
+    if (!tokenizeOK(pollToken(tokenizer))) return NULL;
     if (tokenizer->nextToken.kind != TOKEN_IF && 
             tokenizer->nextToken.kind != TOKEN_ELSE && 
             tokenizer->nextToken.kind != TOKEN_WHILE) {
@@ -254,7 +262,7 @@ AST* parseBranch(Tokenizer* tokenizer) {
     AST* branch = newNode(branchKind, tokenizer->nextToken);
     tokenizer->nextToken.kind = TOKEN_NONE;
 
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
@@ -270,7 +278,7 @@ AST* parseBranch(Tokenizer* tokenizer) {
                      "Invalid expression after (");
     }
 
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
@@ -299,7 +307,7 @@ AST* parseBranch(Tokenizer* tokenizer) {
     if (branchKind == NODE_IF) {
         // try to get matching else
         // defer condition to else->left so that if->left can point to eles
-        if (!pollToken(tokenizer)) return branch;
+        if (!tokenizeOK(pollToken(tokenizer))) return branch;
         if (tokenizer->nextToken.kind == TOKEN_ELSE) {
             // found matching else
             tokenizer->nextToken.kind = TOKEN_NONE;
@@ -332,7 +340,7 @@ AST* parseBlock(Tokenizer* tokenizer) {
     // C S3
     // ...
 
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
@@ -344,7 +352,7 @@ AST* parseBlock(Tokenizer* tokenizer) {
     AST* curr = block->right;
 
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, block->token.pos },
                         "Unmatched token");
         }
@@ -362,7 +370,7 @@ AST* parseBlock(Tokenizer* tokenizer) {
 AST* parseDefinition(Tokenizer* tokenizer) {
     AST* type = parseType(tokenizer);
     if (type == NULL) return NULL;
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
@@ -381,14 +389,14 @@ AST* parseAssignment(Tokenizer* original) {
     Tokenizer current = *original;
     Tokenizer* tokenizer = &current;
     
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
     AST* lvalue = parseLvalue(tokenizer);
     if (lvalue == NULL) return NULL;
 
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
@@ -416,7 +424,7 @@ AST* parseExpression(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                         "Unexpected end of file");
         }
@@ -441,7 +449,7 @@ AST* parseLogicalTerm(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                         "Unexpected end of file");
         }
@@ -462,7 +470,7 @@ AST* parseLogicalFactor(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                         "Unexpected end of file");
         }
@@ -486,7 +494,7 @@ AST* parseComparison(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                         "Unexpected end of file");
         }
@@ -514,7 +522,7 @@ AST* parseValue(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                         "Unexpected end of file");
         }
@@ -538,7 +546,7 @@ AST* parseTerm(Tokenizer* tokenizer) {
     if (root == NULL) return NULL;
     AST* curr = root;
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                         "Unexpected end of file");
         }
@@ -562,8 +570,8 @@ AST* parseTerm(Tokenizer* tokenizer) {
 /* end of uninteresting functions */
 
 AST* parseFactor(Tokenizer* tokenizer) {
-    // if (!pollToken(tokenizer)) return NULL;
-    if (!pollToken(tokenizer)) {
+    // if (!tokenizeOK(pollToken(tokenizer))) return NULL;
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                      "Unexpected end of file");
     }
@@ -624,7 +632,7 @@ AST* parseCall(Tokenizer* original) {
     Tokenizer current = *original;
     Tokenizer* tokenizer = &current;
 
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                     "Unexpected end of file");
     }
@@ -633,7 +641,7 @@ AST* parseCall(Tokenizer* original) {
     tokenizer->nextToken.kind = TOKEN_NONE;
     
     // similar to block
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                     "Unexpected end of file");
     }
@@ -646,7 +654,7 @@ AST* parseCall(Tokenizer* original) {
 
     AST* firstArg = parseExpression(tokenizer);
     if (firstArg == NULL) {
-        assert(pollToken(tokenizer)); // redundant
+        assert(tokenizeOK(pollToken(tokenizer))); // redundant
         if (tokenizer->nextToken.kind == TOKEN_RPAREN) {
             tokenizer->nextToken.kind = TOKEN_NONE;
             *original = current;
@@ -662,7 +670,7 @@ AST* parseCall(Tokenizer* original) {
     curr = curr->right;
 
     while (1) {
-        if (!pollToken(tokenizer)) {
+        if (!tokenizeOK(pollToken(tokenizer))) {
             compileError((FileInfo) { tokenizer->filename, call->token.pos },
                         "Unmatched token");
         }
@@ -696,7 +704,7 @@ AST* parseCall(Tokenizer* original) {
 // null if no type, otherwise type lvalue
 // if array, left will be enclosed expr
 AST* parseLvalue(Tokenizer* tokenizer) {
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                     "Unexpected end of file");
     }
@@ -717,7 +725,7 @@ AST* parseLvalue(Tokenizer* tokenizer) {
 
 // equivalent to above function
 AST* parseType(Tokenizer* tokenizer) {
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         return NULL;
         // compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
         //             "Unexpected end of file (PARSE TYPE)");
@@ -741,7 +749,7 @@ AST* parseType(Tokenizer* tokenizer) {
 // returns the expression node
 // caller should use it appropriately (lvalue, array decl)
 AST* parseSubscript(Tokenizer* tokenizer) {
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                     "Unexpected end of file");
     }
@@ -757,7 +765,7 @@ AST* parseSubscript(Tokenizer* tokenizer) {
                     "Expected expression after [");
     }
 
-    if (!pollToken(tokenizer)) {
+    if (!tokenizeOK(pollToken(tokenizer))) {
         compileError((FileInfo) { tokenizer->filename, tokenizer->nextToken.pos },
                     "Unexpected end of file");
     }
