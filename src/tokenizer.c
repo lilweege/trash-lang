@@ -81,7 +81,6 @@ TokenizerResult pollTokenWithComments(Tokenizer* tokenizer) {
         return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
     }
 
-    bool isComment = false;
     size_t lineDiff, colDiff;
     do {
         // whitespace
@@ -97,14 +96,13 @@ TokenizerResult pollTokenWithComments(Tokenizer* tokenizer) {
         char curChar = *tokenizer->source.data;
         if (curChar == '?') {
             // it is a comment
-            isComment = true;
             size_t commentEnd = 0;
+            tokenizer->nextToken.kind = TOKEN_COMMENT;
             if (!svFirstIndexOfChar(tokenizer->source, '\n', &commentEnd)) {
-                svLeftChop(&tokenizer->source, tokenizer->source.size);
+                // no newline => end of file
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, tokenizer->source.size);
                 break;
             }
-            
-            tokenizer->nextToken.kind = TOKEN_COMMENT;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, commentEnd+1);
             tokenizer->curPos.line++;
             tokenizer->curPos.col = 0;
@@ -114,7 +112,10 @@ TokenizerResult pollTokenWithComments(Tokenizer* tokenizer) {
         colDiff = tokenizer->curPos.col - colsBefore;
     } while (lineDiff != 0 || colDiff != 0);
 
-    if (isComment) {
+    if (tokenizer->nextToken.kind == TOKEN_COMMENT) {
+        tokenizer->nextToken.pos.line = tokenizer->curPos.line + 1;
+        tokenizer->nextToken.pos.col = tokenizer->curPos.col + 1;
+        tokenizer->curPos.col += tokenizer->nextToken.text.size;
         return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
     }
 
