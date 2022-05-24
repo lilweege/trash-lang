@@ -103,7 +103,8 @@ TokenizerResult pollTokenWithComments(Tokenizer* tokenizer) {
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, tokenizer->source.size);
                 break;
             }
-            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, commentEnd+1);
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, commentEnd);
+            svLeftChop(&tokenizer->source, 1);
             tokenizer->curPos.line++;
             tokenizer->curPos.col = 0;
         }
