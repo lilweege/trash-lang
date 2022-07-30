@@ -91,11 +91,11 @@ TypeKind binaryResultTypeKind(TypeKind kind1, TypeKind kind2, NodeKind op) {
 const char* typeKindName(TypeKind type) {
     static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
     const char* TypeKindNames[5] = {
-        "TYPE_NONE",
-        "TYPE_STR",
-        "TYPE_U8",
-        "TYPE_I64",
-        "TYPE_F64",
+        [TYPE_NONE] = "TYPE_NONE",
+        [TYPE_STR] = "TYPE_STR",
+        [TYPE_U8] = "TYPE_U8",
+        [TYPE_I64] = "TYPE_I64",
+        [TYPE_F64] = "TYPE_F64",
     };
     return TypeKindNames[type];
 }
@@ -103,11 +103,11 @@ const char* typeKindName(TypeKind type) {
 const char* typeKindKeyword(TypeKind type) {
     static_assert(TYPE_COUNT == 5, "Exhaustive check of type kinds failed");
     const char* TypeKindKeywords[5] = {
-        "void",
-        "str",
-        "u8",
-        "i64",
-        "f64",
+        [TYPE_NONE] = "void",
+        [TYPE_STR] = "str",
+        [TYPE_U8] = "u8",
+        [TYPE_I64] = "i64",
+        [TYPE_F64] = "f64",
     };
     return TypeKindKeywords[type];
 }
