@@ -2,16 +2,16 @@ CC = clang++
 BIN = bin
 OBJ = obj
 SRC = src
-TARGET = $(BIN)/trash
+TARGET = $(BIN)/trashc
 SRCS = $(wildcard $(SRC)/*.cpp)
 OBJS = $(patsubst $(SRC)/%.cpp,$(OBJ)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 
 CC_COMMON = -std=c++20 -march=native -Wall -Wextra -Wpedantic
-CC_DEBUG = -g -DDEBUG -fsanitize=undefined
+CC_DEBUG = -g -DDEBUG -fsanitize=address,undefined
 CC_RELEASE = -O3 -Werror
 LD_COMMON = 
-LD_DEBUG = -fsanitize=undefined
+LD_DEBUG = -fsanitize=address,undefined
 LD_RELEASE = 
 
 CCFLAGS = $(CC_COMMON) $(CC_DEBUG)
