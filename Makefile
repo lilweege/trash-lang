@@ -1,15 +1,15 @@
+CC = clang++
 BIN = bin
 OBJ = obj
 SRC = src
 TARGET = $(BIN)/trash
-SRCS = $(wildcard $(SRC)/*.c)
-OBJS = $(patsubst $(SRC)/%.c,$(OBJ)/%.o,$(SRCS))
+SRCS = $(wildcard $(SRC)/*.cpp)
+OBJS = $(patsubst $(SRC)/%.cpp,$(OBJ)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 
-# TODO: compile with -Werror
-CC_COMMON = -std=c11 -march=native -Wall -Wextra -Wshadow -Wunused -Wpedantic -DLINUX
+CC_COMMON = -std=c++20 -march=native -Wall -Wextra -Wpedantic
 CC_DEBUG = -g -DDEBUG -fsanitize=undefined
-CC_RELEASE = -O2
+CC_RELEASE = -O3 -Werror
 LD_COMMON = 
 LD_DEBUG = -fsanitize=undefined
 LD_RELEASE = 
@@ -23,7 +23,7 @@ debug: $(TARGET)
 -include $(DEPS)
 release: clean $(TARGET)
 
-$(OBJ)/%.o: $(SRC)/%.c
+$(OBJ)/%.o: $(SRC)/%.cpp
 	$(CC) -MMD $(CCFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJS)
