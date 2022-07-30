@@ -1,0 +1,80 @@
+
+? this is a comment
+
+proc primes(let u64 N) -> u64 {
+    mut u8[N] sieve;
+    for (let i64 i = 0; i < N; i = i + 1)
+        sieve[i] = 0;
+    
+    let i64 root = sqrt(N);
+    for (mut i64 i = 0; i < root; i = i + 1) {
+        if (sieve[i]) {
+            for (mut i64 j = 0; j <= N; j = j + 1) {
+                sieve[j] = 0;
+            }
+        }
+    }
+
+    mut i64 cnt = 0;
+    for (let i64 i = 0; i < N; i = i + 1) {
+        if (sieve[i]) cnt = cnt + 1;
+    }
+    return cnt;
+}
+
+proc fizzbuzz() {
+    for (mut i64 i = 0; i < 100; i = i + 1) {
+        let u8 div3 = i % 3 == 0;
+        let u8 div5 = i % 5 == 0;
+
+        if (div3 && div5) puts("FizzBuzz");
+        else if (div3)    puts("Fizz");
+        else if (div5)    puts("Buzz");
+        else              puti(i);
+        putc('\n');
+    }
+}
+
+proc approxPi() -> f64 {
+    let i64 N = 1000000;
+    mut f64 pi = 0.0;
+    for (mut i64 i = 0; i < N; i = i + 1) {
+        let f64 x = 1.0 / (2.0 * itf(i) + 1.0);
+        if (i % 2)
+            pi = pi - x;
+        else
+            pi = pi + x;
+    }
+    pi = pi * 4.0;
+
+    return pi;
+}
+
+
+proc collatz(mut i64 x) -> i64 {
+    mut i64 n = 0;
+    for (; x > 1; n = n + 1) {
+        if (x % 2 == 1) {
+            x = x * 3 + 1;
+        }
+        else {
+            x = x / 2;
+        }
+    }
+    return n;
+}
+
+proc add(let i64 x, let i64 y) -> i64 {
+    return x + y;
+}
+
+proc mulmod(let i64 x, let i64 y, let i64 m) -> i64 {
+    return (x * y) % m;
+}
+
+proc entry() {
+    puts("hello world\n");
+    puti(primes(1000001)); putc('\n');
+    puti(collatz(27)); putc('\n');
+    putf(approxPi()); putc('\n');
+}
