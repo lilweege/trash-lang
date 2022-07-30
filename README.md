@@ -1,3 +1,6 @@
+# V2 IS IN PROGRESS, THIS BRANCH WILL BE DELETED
+
+
 # trash-lang
 
 My first programming language written from scratch in C
