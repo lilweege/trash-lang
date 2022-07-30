@@ -1,7 +1,7 @@
 
 ? this is a comment
 
-proc primes(let u64 N) -> u64 {
+proc primes(let i64 N) -> i64 {
     mut u8[N] sieve;
     for (let i64 i = 0; i < N; i = i + 1)
         sieve[i] = 0;
@@ -39,11 +39,9 @@ proc approxPi() -> f64 {
     let i64 N = 1000000;
     mut f64 pi = 0.0;
     for (mut i64 i = 0; i < N; i = i + 1) {
-        let f64 x = 1.0 / (2.0 * itf(i) + 1.0);
-        if (i % 2)
-            pi = pi - x;
-        else
-            pi = pi + x;
+        mut f64 x = 1.0 / (2.0 * itf(i) + 1.0);
+        if (i % 2) x = -x;
+        pi = pi + x;
     }
     pi = pi * 4.0;
 
