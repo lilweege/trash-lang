@@ -1,0 +1,23 @@
+
+i64 one() {
+    puti(1);
+}
+
+i64 neg(i64 x) {
+    puti(-x);
+}
+
+i64 add(i64 a, i64 b) {
+    puti(a + b);
+}
+
+i64 mulmod(i64 a, i64 b, i64 m) {
+    puti(a * b % m);
+}
+
+?puts("BEFORE\n");
+?one();             ? 1
+?neg(4);            ? -4
+?add(34, 35);       ? 69
+?mulmod(2, 3, 5);   ? 1
+?puts("AFTER\n");

@@ -1,5 +1,4 @@
 #include "tokenizer.h"
-#include "compiler.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,9 +7,10 @@
 #include <stdarg.h>
 
 const char* tokenKindName(TokenKind kind) {
-    static_assert(TOKEN_COUNT == 33, "Exhaustive check of token kinds failed");
-    const char* TokenKindNames[33] = {
+    static_assert(TOKEN_COUNT == 34, "Exhaustive check of token kinds failed");
+    const char* TokenKindNames[34] = {
         [TOKEN_NONE] = "TOKEN_NONE",
+        [TOKEN_COMMENT] = "TOKEN_COMMENT",
         [TOKEN_SEMICOLON] = "TOKEN_SEMICOLON",
         [TOKEN_IDENTIFIER] = "TOKEN_IDENTIFIER",
         [TOKEN_IF] = "TOKEN_IF",
@@ -48,10 +48,37 @@ const char* tokenKindName(TokenKind kind) {
 }
 
 
-// consumed token == true
-bool pollToken(Tokenizer* tokenizer) {
+
+TokenizerResult pollToken(Tokenizer* tokenizer) {
+    TokenizerResult res;
+
+    res = pollTokenWithComments(tokenizer);
+    if (res.err != TOKENIZER_ERROR_NONE)
+        return res;
+    while (tokenizer->nextToken.kind == TOKEN_COMMENT) {
+        tokenizer->nextToken.kind = TOKEN_NONE;
+        res = pollTokenWithComments(tokenizer);
+        if (res.err != TOKENIZER_ERROR_NONE)
+            return res;
+    }
+    return res;
+}
+
+#define TOKEN_UNIMPLEMENTED(token) \
+    return (TokenizerResult) {                                  \
+        .err = TOKENIZER_ERROR_FAIL,                            \
+            .info = {                                           \
+                .filename = tokenizer->filename,                \
+                .location = {                                   \
+                    .line = tokenizer->nextToken.pos.line + 1,  \
+                    .col = tokenizer->nextToken.pos.col + 1,    \
+                }                                               \
+            },                                                  \
+        .msg = token" not implemented yet" }
+
+TokenizerResult pollTokenWithComments(Tokenizer* tokenizer) {
     if (tokenizer->nextToken.kind != TOKEN_NONE) {
-        return true;
+        return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
     }
 
     size_t lineDiff, colDiff;
@@ -68,12 +95,16 @@ bool pollToken(Tokenizer* tokenizer) {
         }
         char curChar = *tokenizer->source.data;
         if (curChar == '?') {
+            // it is a comment
             size_t commentEnd = 0;
+            tokenizer->nextToken.kind = TOKEN_COMMENT;
             if (!svFirstIndexOfChar(tokenizer->source, '\n', &commentEnd)) {
-                svLeftChop(&tokenizer->source, tokenizer->source.size);
+                // no newline => end of file
+                tokenizer->nextToken.text = svLeftChop(&tokenizer->source, tokenizer->source.size);
                 break;
             }
-            svLeftChop(&tokenizer->source, commentEnd+1);
+            tokenizer->nextToken.text = svLeftChop(&tokenizer->source, commentEnd);
+            svLeftChop(&tokenizer->source, 1);
             tokenizer->curPos.line++;
             tokenizer->curPos.col = 0;
         }
@@ -82,9 +113,17 @@ bool pollToken(Tokenizer* tokenizer) {
         colDiff = tokenizer->curPos.col - colsBefore;
     } while (lineDiff != 0 || colDiff != 0);
 
+    if (tokenizer->nextToken.kind == TOKEN_COMMENT) {
+        tokenizer->nextToken.pos.line = tokenizer->curPos.line + 1;
+        tokenizer->nextToken.pos.col = tokenizer->curPos.col + 1;
+        tokenizer->curPos.col += tokenizer->nextToken.text.size;
+        return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
+    }
+
+
     if (tokenizer->source.size == 0) {
         // printf("POLLED NOTHING\n");
-        return false;
+        return (TokenizerResult){.err=TOKENIZER_ERROR_EMPTY};
     }
 
     char curChar = *tokenizer->source.data;
@@ -184,7 +223,7 @@ bool pollToken(Tokenizer* tokenizer) {
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
             }
             else {
-                assert(0 && "&? not implemented yet");
+                TOKEN_UNIMPLEMENTED("&?");
             }
         } break;
 
@@ -194,7 +233,7 @@ bool pollToken(Tokenizer* tokenizer) {
                 tokenizer->nextToken.text = svLeftChop(&tokenizer->source, 2);
             }
             else {
-                assert(0 && "|? not implemented yet");
+                TOKEN_UNIMPLEMENTED("|?");
             }
         } break;
 
@@ -231,10 +270,17 @@ bool pollToken(Tokenizer* tokenizer) {
                     break;
                 }
                 if (tokenizer->source.data[idx] == '\n') {
-                    compileErrorAt(tokenizer->filename,
-                                   tokenizer->curPos.line + 1,
-                                   tokenizer->curPos.col + idx + 1,
-                                   "Unexpected end of line in string literal");
+                    return (TokenizerResult) {
+                        .err = TOKENIZER_ERROR_FAIL,
+                        .info = {
+                            .filename = tokenizer->filename,
+                            .location = {
+                                .line = tokenizer->curPos.line + 1,
+                                .col = tokenizer->curPos.col + idx + 1,
+                            }
+                        },
+                        .msg = "Unexpected end of line in string literal"
+                    };
                 }
                 if (tokenizer->source.data[idx] == '\\') {
                     ++idx;
@@ -243,37 +289,60 @@ bool pollToken(Tokenizer* tokenizer) {
                     }
                     char escapeChar = tokenizer->source.data[idx];
                     if (escapeChar != delim && escapeChar != '\n' &&
-                            escapeChar != 'n' && escapeChar != 't' && escapeChar != '\\') {
-                        compileErrorAt(tokenizer->filename,
-                                       tokenizer->curPos.line + 1,
-                                       tokenizer->curPos.col + idx + 1,
-                                       "Invalid escape sequence '\\%c'", escapeChar);
+                        escapeChar != 'n' && escapeChar != 't' && escapeChar != '\\')
+                    {
+                        return (TokenizerResult) {
+                            .err = TOKENIZER_ERROR_FAIL,
+                            .info = {
+                                .filename = tokenizer->filename,
+                                .location = {
+                                    .line = tokenizer->curPos.line + 1,
+                                    .col = tokenizer->curPos.col + idx + 1,
+                                }
+                            },
+                            .msg = "Invalid escape sequence"
+                        };
                     }
                 }
             }
             if (idx >= tokenizer->source.size) {
-                compileErrorAt(tokenizer->filename,
-                               tokenizer->curPos.line + 1,
-                               tokenizer->curPos.col + idx + 1,
-                               "Unexpected end of file in string literal");
+                return (TokenizerResult) {
+                    .err = TOKENIZER_ERROR_FAIL,
+                    .info = {
+                        .filename = tokenizer->filename,
+                        .location = {
+                            .line = tokenizer->curPos.line + 1,
+                            .col = tokenizer->curPos.col + idx + 1,
+                        }
+                    },
+                    .msg = "Unexpected end of file in string literal"
+                };
             }
             tokenizer->curPos.col += 2; // quotes are not included in string literal token
             tokenizer->nextToken.kind = delim == '"' ? TOKEN_STRING_LITERAL : TOKEN_CHAR_LITERAL;
             tokenizer->nextToken.text = svLeftChop(&tokenizer->source, idx);
             if (tokenizer->nextToken.kind == TOKEN_CHAR_LITERAL) {
                 if ((tokenizer->nextToken.text.size == 2 && tokenizer->nextToken.text.data[0] != '\\') ||
-                        tokenizer->nextToken.text.size > 2) {
-                    compileErrorAt(tokenizer->filename,
-                                   tokenizer->nextToken.pos.line,
-                                   tokenizer->nextToken.pos.col + 1,
-                                   "Max length of character literal exceeded");
+                    tokenizer->nextToken.text.size > 2)
+                {
+                    return (TokenizerResult) {
+                        .err = TOKENIZER_ERROR_FAIL,
+                        .info = {
+                            .filename = tokenizer->filename,
+                            .location = {
+                                .line = tokenizer->nextToken.pos.line,
+                                .col = tokenizer->nextToken.pos.col + 1,
+                            }
+                        },
+                        .msg = "Max length of character literal exceeded"
+                    };
                 }
             }
             svLeftChop(&tokenizer->source, 1); // close quote
         } break;
 
-        case '\\': assert(0 && "char \\ not implemented yet"); break;
-        case '.': assert(0 && "char . not implemented yet"); break;
+        case '\\': TOKEN_UNIMPLEMENTED("\\"); break;
+        case '.': TOKEN_UNIMPLEMENTED("."); break;
         // TODO: other operators and combinations
 
         default: {
@@ -312,8 +381,9 @@ bool pollToken(Tokenizer* tokenizer) {
                 }
             }
             else {
-                fprintf(stderr, "ERROR: Unhandled character %d: '%c'\n", curChar, curChar);
-                exit(1);
+                TOKEN_UNIMPLEMENTED("OTHER");
+                // fprintf(stderr, "ERROR: Unhandled character %d: '%c'\n", curChar, curChar);
+                // exit(1);
             }
         }
     }
@@ -328,6 +398,7 @@ bool pollToken(Tokenizer* tokenizer) {
     //         tokenizer->nextToken.pos.line+1,
     //         tokenizer->nextToken.pos.col+1,
     //         SV_ARG(tokenizer->nextToken.text));
-    return true;
+    return (TokenizerResult){.err=TOKENIZER_ERROR_NONE};
 }
 
+#undef TOKEN_UNIMPLEMENTED
