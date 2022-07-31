@@ -9,15 +9,14 @@ proc primes(let i64 N) -> i64 {
     
     let i64 root = sqrt(N);
     for (mut i64 i = 0; i < root; i = i + 1) {
-        if (sieve[i]) {
-            for (mut i64 j = 0; j <= N; j = j + 1) {
-                sieve[j] = 0;
-            }
+        if (!sieve[i]) continue;
+        for (mut i64 j = 0; j <= N; j = j + 1) {
+            sieve[j] = 0;
         }
     }
 
     mut i64 cnt = 0;
-    for (let i64 i = 0; i < N; i = i + 1) {
+    for (mut i64 i = 0; i < N; i = i + 1) {
         if (sieve[i]) cnt = cnt + 1;
     }
     return cnt;
@@ -52,7 +51,8 @@ proc approxPi() -> f64 {
 
 proc collatz(mut i64 x) -> i64 {
     mut i64 n = 0;
-    for (; x > 1; n = n + 1) {
+    for (;; n = n + 1) {
+        if (x <= 0) break;
         if (x % 2 == 1) {
             x = x * 3 + 1;
         }
@@ -63,13 +63,11 @@ proc collatz(mut i64 x) -> i64 {
     return n;
 }
 
-proc add(let i64 x, let i64 y) -> i64 {
+proc add(let i64 x, let i64 y) -> i64
     return x + y;
-}
 
-proc mulmod(let i64 x, let i64 y, let i64 m) -> i64 {
+proc mulmod(let i64 x, let i64 y, let i64 m) -> i64
     return (x * y) % m;
-}
 
 proc entry() {
     puts("hello world\n");

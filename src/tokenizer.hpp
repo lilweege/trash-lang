@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-enum class TokenKind : int {
+enum class TokenKind {
     NONE,
     COMMENT,
     SEMICOLON,
@@ -12,6 +12,11 @@ enum class TokenKind : int {
     ELSE,
     FOR,
     PROC,
+    LET,
+    MUT,
+    RETURN,
+    BREAK,
+    CONTINUE,
     U8,
     I64,
     F64,
@@ -45,7 +50,6 @@ enum class TokenKind : int {
     // ...
     TOKEN_COUNT
 };
-const char* TokenKindName(TokenKind kind);
 
 enum class TokenizerError {
     NONE,
@@ -77,5 +81,7 @@ struct Tokenizer {
 };
 
 
+const char* TokenKindName(TokenKind kind);
 TokenizerResult PollToken(Tokenizer& tokenizer);
+void ConsumeToken(Tokenizer& tokenizer);
 bool TokenizeOK(const TokenizerResult& result);

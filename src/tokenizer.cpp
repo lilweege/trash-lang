@@ -7,8 +7,8 @@
 
 const char* TokenKindName(TokenKind kind) {
     assert(int(kind) > 0 && int(kind) < int(TokenKind::TOKEN_COUNT));
-    static_assert(int(TokenKind::TOKEN_COUNT) == 38, "Exhaustive check of token kinds failed");
-    const char* TokenKindNames[38] = {
+    static_assert(int(TokenKind::TOKEN_COUNT) == 43, "Exhaustive check of token kinds failed");
+    const char* TokenKindNames[43] = {
         "TokenKind::NONE",
         "TokenKind::COMMENT",
         "TokenKind::SEMICOLON",
@@ -17,6 +17,11 @@ const char* TokenKindName(TokenKind kind) {
         "TokenKind::ELSE",
         "TokenKind::FOR",
         "TokenKind::PROC",
+        "TokenKind::LET",
+        "TokenKind::MUT",
+        "TokenKind::RETURN",
+        "TokenKind::BREAK",
+        "TokenKind::CONTINUE",
         "TokenKind::U8",
         "TokenKind::I64",
         "TokenKind::F64",
@@ -381,20 +386,18 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                 // identifier or keyword
                 tokenizer.curToken.kind = TokenKind::IDENTIFIER;
                 tokenizer.curToken.text = LeftChopWhile(tokenizer, IsIdentifier);
-                if (tokenizer.curToken.text == "if")
-                    tokenizer.curToken.kind = TokenKind::IF;
-                else if (tokenizer.curToken.text == "else")
-                    tokenizer.curToken.kind = TokenKind::ELSE;
-                else if (tokenizer.curToken.text == "for")
-                    tokenizer.curToken.kind = TokenKind::FOR;
-                else if (tokenizer.curToken.text == "u8")
-                    tokenizer.curToken.kind = TokenKind::U8;
-                else if (tokenizer.curToken.text == "i64")
-                    tokenizer.curToken.kind = TokenKind::I64;
-                else if (tokenizer.curToken.text == "f64")
-                    tokenizer.curToken.kind = TokenKind::F64;
-                else if (tokenizer.curToken.text == "proc")
-                    tokenizer.curToken.kind = TokenKind::PROC;
+                if (tokenizer.curToken.text == "if")            tokenizer.curToken.kind = TokenKind::IF;
+                else if (tokenizer.curToken.text == "else")     tokenizer.curToken.kind = TokenKind::ELSE;
+                else if (tokenizer.curToken.text == "for")      tokenizer.curToken.kind = TokenKind::FOR;
+                else if (tokenizer.curToken.text == "u8")       tokenizer.curToken.kind = TokenKind::U8;
+                else if (tokenizer.curToken.text == "i64")      tokenizer.curToken.kind = TokenKind::I64;
+                else if (tokenizer.curToken.text == "f64")      tokenizer.curToken.kind = TokenKind::F64;
+                else if (tokenizer.curToken.text == "proc")     tokenizer.curToken.kind = TokenKind::PROC;
+                else if (tokenizer.curToken.text == "let")      tokenizer.curToken.kind = TokenKind::LET;
+                else if (tokenizer.curToken.text == "mut")      tokenizer.curToken.kind = TokenKind::MUT;
+                else if (tokenizer.curToken.text == "return")   tokenizer.curToken.kind = TokenKind::RETURN;
+                else if (tokenizer.curToken.text == "break")    tokenizer.curToken.kind = TokenKind::BREAK;
+                else if (tokenizer.curToken.text == "continue") tokenizer.curToken.kind = TokenKind::CONTINUE;
             }
             else if (IsNumeric(curChar)) {
                 // integer literal
@@ -423,16 +426,22 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
 }
 
 TokenizerResult PollToken(Tokenizer& tokenizer) {
-    return PollTokenWithComments(tokenizer);
+    TokenizerResult res = PollTokenWithComments(tokenizer);
+    if (res.err != TokenizerError::NONE)
+        return res;
+    while (tokenizer.curToken.kind == TokenKind::COMMENT) {
+        tokenizer.curToken.kind = TokenKind::NONE;
+        res = PollTokenWithComments(tokenizer);
+        if (res.err != TokenizerError::NONE)
+            return res;
+    }
+    return res;
 }
 
 bool TokenizeOK(const TokenizerResult& result) {
-    if (result.err == TokenizerError::NONE) return true;
-    if (result.err == TokenizerError::EMPTY) return false;
-    if (result.err == TokenizerError::FAIL)
-        // compileError(result.info, result.msg);
-        return false;
+    return result.err == TokenizerError::NONE;
+}
 
-    static_assert(int(TokenizerError::FAIL) == 2);
-    return false;
+void ConsumeToken(Tokenizer& tokenizer) {
+    tokenizer.curToken.kind = TokenKind::NONE;
 }
