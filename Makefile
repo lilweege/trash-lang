@@ -8,8 +8,8 @@ OBJS = $(patsubst $(SRC)/%.cpp,$(OBJ)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 
 CC_COMMON = -std=c++20 -march=native -Wall -Wextra -Wpedantic
-CC_DEBUG = -g -DDEBUG -fsanitize=address,undefined
-CC_RELEASE = -O3 -Werror
+CC_DEBUG = -g -fsanitize=address,undefined
+CC_RELEASE = -O3 -DNDEBUG -Werror
 LD_COMMON = 
 LD_DEBUG = -fsanitize=address,undefined
 LD_RELEASE = 
