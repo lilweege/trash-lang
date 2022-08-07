@@ -1,5 +1,6 @@
 #include "compiler.hpp"
 #include "tokenizer.hpp"
+#include "parser.hpp"
 
 #include <fstream>
 #include <vector>
@@ -11,7 +12,14 @@
 struct CompilerOptions {
     std::string srcFn;
     std::string binFn;
-    // ... 
+    // ...
+};
+
+struct Compiler {
+    CompilerOptions options;
+    std::string source;
+    std::vector<Token> tokens;
+    std::vector<AST> ast; // NOTE: these are not pointers, nodes live here
 };
 
 static void PrintUsage() {
@@ -24,7 +32,7 @@ static void PrintUsage() {
     ;
 }
 
-CompilerOptions ParseArguments(int argc, char** argv) {
+static CompilerOptions ParseArguments(int argc, char** argv) {
     CompilerOptions opts{};
     std::vector<std::string> args(argv+1, argv+argc);
     for (auto it = begin(args); it != end(args); ++it) {
@@ -50,48 +58,57 @@ CompilerOptions ParseArguments(int argc, char** argv) {
             exit(1);
         }
     }
+
+    if (opts.srcFn.empty() || opts.binFn.empty()) {
+        PrintUsage();
+        exit(1);
+    }
     return opts;
 }
 
-static std::string ReadFile(const std::string& filename) {
+static std::string ReadEntireFile(const std::string& filename) {
     std::ifstream sourceStream{filename, std::ios::in | std::ios::binary};
     if (!sourceStream) {
         std::cerr << "Error: Could not open file \"" << filename << "\".\n";
         exit(1);
     }
 
-    return std::string{std::istreambuf_iterator<char>{sourceStream}, {}}; 
+    return std::string{std::istreambuf_iterator<char>{sourceStream}, {}};
 }
+
+static std::vector<Token> TokenizeEntireSource(Tokenizer& tokenizer) {
+    // It's debatable if it's better to tokenize the entire source and then parse all tokens,
+    // or interleave tokenizing with parsing.
+    // Notably, storing tokens contiguously and referring to them by pointer reduces the size of each AST node.
+    // Also, constant context switching probably isn't good for the CPU.
+    std::vector<Token> tokens{};
+
+    while (true) {
+        ConsumeToken(tokenizer);
+        TokenizerResult result = PollToken(tokenizer);
+        if (result.err == TokenizerError::FAIL) {
+            std::cerr << result.msg << '\n';
+            exit(1);
+        }
+        else if (result.err == TokenizerError::EMPTY) {
+            break;
+        }
+        tokens.push_back(tokenizer.curToken);
+    }
+
+    return tokens;
+}
+
 
 void CompilerMain(int argc, char** argv) {
     assert(argc > 0);
-    const CompilerOptions opts = ParseArguments(argc, argv);
 
-    if (opts.srcFn.empty() ||
-        opts.binFn.empty())
-    {
-        PrintUsage();
-        exit(1);
-    }
-    
-    Tokenizer tokenizer{
-        .filename = opts.srcFn,
-        .source = ReadFile(opts.srcFn),
-    };
-
-    while (true) {
-        TokenizerResult r = PollToken(tokenizer);
-        if (r.err == TokenizerError::FAIL) {
-            std::cerr << r.msg << '\n';
-            exit(1);
-        }
-        if (r.err == TokenizerError::EMPTY) {
-            break;
-        }
-        std::cout << TokenKindName(tokenizer.curToken.kind) << ":" <<
-                tokenizer.curToken.pos.line << ":" <<
-                tokenizer.curToken.pos.col << ":" <<
-                " \"" << tokenizer.curToken.text << "\"\n";
-        tokenizer.curToken.kind = TokenKind::NONE;
-    }
+    Compiler compiler{};
+    compiler.options = ParseArguments(argc, argv);
+    compiler.source = ReadEntireFile(compiler.options.srcFn);
+    Tokenizer tokenizer{ .filename = compiler.options.srcFn, .source = compiler.source };
+    Parser parser{ .filename = compiler.options.srcFn, .tokens = TokenizeEntireSource(tokenizer) };
+    compiler.ast = ParseProgram(parser);
+    std::cerr << "DONE!\n";
 }
+
