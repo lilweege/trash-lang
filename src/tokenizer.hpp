@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 enum class TokenKind {
     NONE,
@@ -63,7 +64,7 @@ struct TokenizerResult {
 };
 
 struct FileLocation {
-    size_t line, col;
+    uint32_t line, col;
 };
 
 struct Token {
@@ -73,11 +74,12 @@ struct Token {
 };
 
 struct Tokenizer {
-    std::string filename;
-    std::string source;
+    std::string_view filename;
+    std::string_view source;
     size_t sourceIdx;
     Token curToken;
     FileLocation curPos;
+    std::vector<Token> tokens;
 };
 
 

@@ -3,12 +3,12 @@
 
 #include <cassert>
 #include <algorithm>
-
+#include <array>
+#include <iostream>
 
 const char* TokenKindName(TokenKind kind) {
-    assert(int(kind) > 0 && int(kind) < int(TokenKind::TOKEN_COUNT));
-    static_assert(int(TokenKind::TOKEN_COUNT) == 43, "Exhaustive check of token kinds failed");
-    const char* TokenKindNames[43] = {
+    static_assert(static_cast<uint32_t>(TokenKind::TOKEN_COUNT) == 43, "Exhaustive check of token kinds failed");
+    const std::array<const char*, static_cast<uint32_t>(TokenKind::TOKEN_COUNT)> TokenKindNames{
         "TokenKind::NONE",
         "TokenKind::COMMENT",
         "TokenKind::SEMICOLON",
@@ -53,10 +53,10 @@ const char* TokenKindName(TokenKind kind) {
         "TokenKind::STRING_LITERAL",
         "TokenKind::CHAR_LITERAL",
     };
-    return TokenKindNames[int(kind)];
+    return TokenKindNames[static_cast<uint32_t>(kind)];
 }
 
-static void LeftTrim(Tokenizer& tokenizer, size_t* outLineNo, size_t* outColNo) {
+static void LeftTrim(Tokenizer& tokenizer, uint32_t* outLineNo, uint32_t* outColNo) {
     for (;
         tokenizer.sourceIdx < tokenizer.source.size();
         ++tokenizer.sourceIdx)
@@ -89,9 +89,9 @@ static std::string_view LeftChop(Tokenizer& tokenizer, size_t n) {
 }
 
 static std::string_view LeftChopWhile(Tokenizer& tokenizer, auto predicate) {
-    auto begin = tokenizer.source.cbegin()+int(tokenizer.sourceIdx);
-    auto end = std::find_if(begin, tokenizer.source.cend(), [&predicate](char c) { return !predicate(c); } );
-    tokenizer.sourceIdx += end - begin;
+    const auto* begin = tokenizer.source.cbegin() + static_cast<long>(tokenizer.sourceIdx);
+    const auto* end = std::find_if(begin, tokenizer.source.cend(), [&predicate](char c) { return !predicate(c); } );
+    tokenizer.sourceIdx += static_cast<size_t> (end - begin);
     return std::string_view{begin, end};
 }
 
@@ -100,7 +100,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
         return { .err = TokenizerError::NONE };
     }
 
-    size_t lineDiff, colDiff;
+    size_t lineDiff = 0, colDiff = 0;
     do {
         // whitespace
         size_t linesBefore = tokenizer.curPos.line;
@@ -146,8 +146,8 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
             .err = TokenizerError::FAIL,
             .msg = CompileErrorMessage(
                 tokenizer.filename,
-                { .line = tokenizer.curPos.line + 1,
-                    .col = tokenizer.curPos.col + 1, },
+                tokenizer.curPos.line + 1,
+                tokenizer.curPos.col + 1,
                 '"', token, "\" is not implemented yet"),
         };
     };
@@ -310,7 +310,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
         case '\'':
         case '"': {
             char delim = LeftChop(tokenizer, 1)[0];
-            size_t idx;
+            size_t idx = 0;
             for (idx = tokenizer.sourceIdx;
                 idx < tokenizer.source.size();
                 ++idx)
@@ -323,8 +323,8 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                         .err = TokenizerError::FAIL,
                         .msg = CompileErrorMessage(
                             tokenizer.filename,
-                            { .line = tokenizer.curPos.line + 1,
-                                .col = tokenizer.curPos.col + 1, },
+                            tokenizer.curPos.line + 1,
+                            tokenizer.curPos.col + 1,
                             "Unexpected end of line in string literal"),
                     };
                 }
@@ -340,8 +340,8 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                             .err = TokenizerError::FAIL,
                             .msg = CompileErrorMessage(
                                 tokenizer.filename,
-                                { .line = tokenizer.curPos.line + 1,
-                                    .col = tokenizer.curPos.col + idx - tokenizer.sourceIdx + 1, },
+                                tokenizer.curPos.line + 1,
+                                tokenizer.curPos.col + idx - tokenizer.sourceIdx + 1,
                                 "Invalid escape sequence"),
                         };
                     }
@@ -352,7 +352,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                 return {
                     .err = TokenizerError::FAIL,
                     .msg = CompileErrorMessage(
-                        tokenizer.filename, strStart,
+                        tokenizer.filename, strStart.line, strStart.col,
                         "Unexpected end of file in string literal"),
                 };
             }
@@ -366,7 +366,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                     return {
                         .err = TokenizerError::FAIL,
                         .msg = CompileErrorMessage(
-                            tokenizer.filename, strStart,
+                            tokenizer.filename, strStart.line, strStart.col,
                             "Max length of character literal exceeded"),
                     };
                 }
@@ -374,8 +374,8 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
             ++tokenizer.sourceIdx;
         } break;
 
-        case '\\': return TokenUnimplemnted("\\"); break;
-        case '.': return TokenUnimplemnted("."); break;
+        case '\\': return TokenUnimplemnted("\\");
+        case '.': return TokenUnimplemnted(".");
         // TODO: other operators and combinations
 
         default: {
@@ -445,3 +445,6 @@ bool TokenizeOK(const TokenizerResult& result) {
 void ConsumeToken(Tokenizer& tokenizer) {
     tokenizer.curToken.kind = TokenKind::NONE;
 }
+
+
+
