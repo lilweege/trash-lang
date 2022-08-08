@@ -42,10 +42,9 @@
 // CharacterLiteral =  ' AsciiOrEscapeChar '
 
 enum class ASTKind : uint8_t {
-    // UNINITIALIZED,
+    UNINITIALIZED,
     PROGRAM,
     PROCEDURE,
-    BODY,
     IF_STATEMENT,
     FOR_STATEMENT,
     RETURN_STATEMENT,
@@ -78,6 +77,7 @@ enum class ASTKind : uint8_t {
     // ...
     COUNT
 };
+const char* ASTKindName(ASTKind kind);
 
 enum class TypeKind : uint8_t {
     NONE, // void functions
@@ -89,27 +89,30 @@ enum class TypeKind : uint8_t {
 
 using TokenIndex = uint32_t;
 using ASTIndex = uint32_t;
-
+const ASTIndex AST_NULL = 0; // Null points to the root
 
 // TODO: change all of this
 struct AST {
-    // std::stringview not trivial?
-//     using StringView = std::string_view;
+//     struct ASTList {
+//         ASTIndex first;
+//         uint32_t numStmts;
+//     };
+    using ASTList = std::vector<ASTIndex>*;
+
+//     using StringView = std::string_view; // std::string_view is not trivial :(
     struct StringView {
         const char* buf;
         size_t sz;
     };
 
-
-    // TODO: remove redundant firstIndex when it will always immediately follow
-    struct ASTList {
-        ASTIndex firstStmt;
-        uint32_t numStmts;
+    struct ASTProgram {
+        ASTList procedures;
     };
 
     struct ASTProcedure {
         ASTList params;
         ASTList body;
+        TypeKind retType;
     };
 
     struct ASTUnaryOperator {
@@ -130,6 +133,16 @@ struct AST {
         };
     };
 
+    struct ASTLValue {
+        // Access ident through token
+        ASTIndex subscript; // Optional
+    };
+
+    struct ASTCall {
+        // Access proc name through token
+        ASTList args;
+    };
+
     struct ASTIf {
         ASTIndex cond;
         ASTList body;
@@ -145,7 +158,7 @@ struct AST {
 
     struct ASTDefinition {
         // Access ident through token
-        ASTIndex size; // Should be integer literal
+        ASTIndex arraySize; // Should be integer literal
         ASTIndex initExpr; // Optional
         bool isConst; // let/mut
         TypeKind type;
@@ -161,6 +174,8 @@ struct AST {
         ASTIndex expr;
     };
 
+
+
     ASTKind kind;
 //     union {
 //         // TODO: flags ...
@@ -169,11 +184,15 @@ struct AST {
     // 8 bytes
 
     union {
+        ASTProgram program;
+
         ASTProcedure proc;
 
         ASTBinaryOperator binaryOp;
         ASTUnaryOperator unaryOp;
         ASTLiteral literal;
+        ASTLValue lvalue;
+        ASTCall call;
 
         ASTIf ifstmt;
         ASTFor forstmt;
@@ -188,11 +207,12 @@ struct AST {
 struct Parser {
     std::string_view filename;
     std::vector<Token> tokens;
-    size_t tokenIdx;
+    TokenIndex tokenIdx;
+    std::vector<AST>* mem;
 };
 
-std::vector<AST> ParseProgram(Parser& parser);
+std::vector<AST> ParseEntireProgram(Parser& parser);
 
-
-// static_assert(std::is_trivial_v<AST>);
+static_assert(std::is_trivial_v<AST>);
+static_assert(sizeof(AST) <= 32);
 

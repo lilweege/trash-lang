@@ -82,6 +82,7 @@ static std::vector<Token> TokenizeEntireSource(Tokenizer& tokenizer) {
     // Notably, storing tokens contiguously and referring to them by pointer reduces the size of each AST node.
     // Also, constant context switching probably isn't good for the CPU.
     std::vector<Token> tokens{};
+    tokens.emplace_back(); // Reserved empty token
 
     while (true) {
         ConsumeToken(tokenizer);
@@ -108,7 +109,7 @@ void CompilerMain(int argc, char** argv) {
     compiler.source = ReadEntireFile(compiler.options.srcFn);
     Tokenizer tokenizer{ .filename = compiler.options.srcFn, .source = compiler.source };
     Parser parser{ .filename = compiler.options.srcFn, .tokens = TokenizeEntireSource(tokenizer) };
-    compiler.ast = ParseProgram(parser);
+    compiler.ast = ParseEntireProgram(parser);
     std::cerr << "DONE!\n";
 }
 
