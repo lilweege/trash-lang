@@ -148,7 +148,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                 tokenizer.filename,
                 tokenizer.curPos.line + 1,
                 tokenizer.curPos.col + 1,
-                '"', token, "\" is not implemented yet"),
+                "\"{}\" is not implemented yet", token),
         };
     };
 

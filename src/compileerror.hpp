@@ -2,15 +2,12 @@
 
 #include "tokenizer.hpp"
 
-#include <sstream>
-#include <utility>
+#include <fmt/core.h>
 
-template<typename... Args>
-std::string CompileErrorMessage(std::string_view filename, size_t line, size_t col, Args&&... args) {
-    std::ostringstream ss;
-    // TODO: colored messages
-    ss << filename << ':' << line << ':' << col << ": error: ";
-    (ss << ... << std::forward<Args>(args));
-    return ss.str();
+#define CompileErrorMessage(filename, line, col, fmt, ...) \
+    CompileErrorMessage_("{}:{}:{}: Error: " fmt, filename, line, col __VA_OPT__(,) __VA_ARGS__)
+
+template<typename S, typename... Args>
+std::string CompileErrorMessage_(const S& fmt, Args&&... args) {
+    return fmt::vformat(fmt, fmt::make_format_args(args...));
 }
-

@@ -73,6 +73,7 @@ static std::string ReadEntireFile(const std::string& filename) {
         exit(1);
     }
 
+    // FIXME: This is slow
     return std::string{std::istreambuf_iterator<char>{sourceStream}, {}};
 }
 

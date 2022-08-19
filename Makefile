@@ -10,7 +10,7 @@ DEPS = $(OBJS:.o=.d)
 CC_COMMON = -std=c++20 -march=native -Wall -Wextra -Wpedantic
 CC_DEBUG = -g -fsanitize=address,undefined
 CC_RELEASE = -O3 -DNDEBUG -Werror
-LD_COMMON = 
+LD_COMMON = -lfmt
 LD_DEBUG = -fsanitize=address,undefined
 LD_RELEASE = 
 
