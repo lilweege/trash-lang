@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 #include <cassert>
-#include <iostream>
+#include <fmt/core.h>
 
 
 struct CompilerOptions {
@@ -24,12 +24,12 @@ struct Compiler {
 
 static void PrintUsage() {
     std::vector<std::pair<char, std::string>> options;
-    std::cerr <<
+    fmt::print(stderr,
         "Usage: trashc [options]\n"
         "-i <file>   The name of the input source file to be compiled.\n"
         "-o <file>   The name of the compiled output binary file.\n"
         "-h          Displays this information\n"
-    ;
+    );
 }
 
 static CompilerOptions ParseArguments(int argc, char** argv) {
@@ -69,7 +69,7 @@ static CompilerOptions ParseArguments(int argc, char** argv) {
 static std::string ReadEntireFile(const std::string& filename) {
     std::ifstream sourceStream{filename, std::ios::in | std::ios::binary};
     if (!sourceStream) {
-        std::cerr << "Error: Could not open file \"" << filename << "\".\n";
+        fmt::print(stderr, "Error: Could not open file \"{}\".\n", filename);
         exit(1);
     }
 
@@ -89,7 +89,7 @@ static std::vector<Token> TokenizeEntireSource(Tokenizer& tokenizer) {
         ConsumeToken(tokenizer);
         TokenizerResult result = PollToken(tokenizer);
         if (result.err == TokenizerError::FAIL) {
-            std::cerr << result.msg << '\n';
+            fmt::print(stderr, "{}\n", result.msg);
             exit(1);
         }
         else if (result.err == TokenizerError::EMPTY) {
@@ -111,6 +111,6 @@ void CompilerMain(int argc, char** argv) {
     Tokenizer tokenizer{ .filename = compiler.options.srcFn, .source = compiler.source };
     Parser parser{ .filename = compiler.options.srcFn, .tokens = TokenizeEntireSource(tokenizer) };
     compiler.ast = ParseEntireProgram(parser);
-    std::cerr << "DONE!\n";
+    fmt::print(stderr, "DONE!\n");
 }
 
