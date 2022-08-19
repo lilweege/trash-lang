@@ -2,11 +2,11 @@
 
 ? this is a comment
 
-proc primes(let i64 N) -> i64 {
+proc primes(let i64 N) {
     mut u8[N] sieve;
     for (let i64 i = 0; i < N; i = i + 1)
         sieve[i] = 0;
-    
+
     let i64 root = sqrt(N);
     for (mut i64 i = 0; i < root; i = i + 1) {
         if (!sieve[i]) continue;
@@ -16,9 +16,8 @@ proc primes(let i64 N) -> i64 {
     }
 
     mut i64 cnt = 0;
-    for (mut i64 i = 0; i < N; i = i + 1) {
+    for (mut i64 i = 0; i < N; i = i + 1)
         if (sieve[i]) cnt = cnt + 1;
-    }
     return cnt;
 }
 
@@ -68,6 +67,8 @@ proc add(let i64 x, let i64 y) -> i64
 
 proc mulmod(let i64 x, let i64 y, let i64 m) -> i64
     return (x * y) % m;
+
+proc foo() {}
 
 proc entry() {
     puts("hello world\n");
