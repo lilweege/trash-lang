@@ -171,21 +171,21 @@ static AST& GetAST(const Parser& parser, ASTIndex idx) {
     return (*parser.mem)[idx];
 }
 
-#define CompileErrorAt(parser, token, fmt) do { \
-        CompileErrorMessage((parser).filename, (token).pos.line, (token).pos.col, fmt); \
+#define CompileErrorAt(parser, token, format) do { \
+        CompileErrorMessage((parser).filename, (token).pos.line, (token).pos.col, format); \
         exit(1); \
     } while (0)
 
 
-#define ExpectAndConsumeToken(parser, expectedKind, fmt) do { \
+#define ExpectAndConsumeToken(parser, expectedKind, format) do { \
         const Token& token = PollCurrentToken(parser); \
         if (token.kind != expectedKind) \
-            CompileErrorAt(parser, token, fmt); \
+            CompileErrorAt(parser, token, format); \
     } while (0)
-#define ExpectAndConsumeTokens(parser, predicate, fmt) do { \
+#define ExpectAndConsumeTokens(parser, predicate, format) do { \
         const Token& token = PollCurrentToken(parser); \
         if (!predicate(token)) \
-            CompileErrorAt(parser, token, fmt); \
+            CompileErrorAt(parser, token, format); \
     } while (0)
 
 
@@ -229,7 +229,7 @@ static std::pair<TypeKind, ASTIndex> ParseType(Parser& parser) {
         case TokenKind::I64: return { TypeKind::I64, 0 };
         case TokenKind::F64: return { TypeKind::F64, 0 };
         case TokenKind::U8:  return { TypeKind::U8 , 0 };
-        default: assert(0 && "Unreachable"); break;
+        default: assert(0 && "Unreachable"); return {};
     }
 }
 
