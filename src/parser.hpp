@@ -5,14 +5,14 @@
 #include <vector>
 
 // Language Grammar
-// TODO: bitwise operators, pointers, continue, break, struct
+// TODO: bitwise operators, pointers, struct
 
 // Program             =  { Procedure }
-// ProcedureDefn       =  "proc" Identifier "(" [ VariableDefn { "," VariableDefn } ] ")" [ "->" Type ] Body
+// Procedure           =  "proc" Identifier "(" [ VariableDefn { "," VariableDefn } ] ")" [ "->" Type ] Body
 
 // Body                =  Block | Statement
 // Block               =  "{" { Statement } "}"
-// Statement           =  IfStmt | ForStmt | ( VariableDefnAsgn | Assignment | Expression | "return" Expression | "break" | "continue" ) ";"
+// Statement           =  IfStmt | ForStmt | ( VariableDefnAsgn | Assignment | Expression | "return" [ Expression ] | "break" | "continue" ) ";"
 
 // IfStmt              =  "if" "(" Expression ")" Body [ "else" Body ]
 // ForStmt             =  "for" "(" [ VariableDefnAsgn ] ";" [ Expression ] ";" [ Assignment ] ")" Body
@@ -89,16 +89,11 @@ enum class TypeKind : uint8_t {
 
 using TokenIndex = uint32_t;
 using ASTIndex = uint32_t;
+using ASTList = uint32_t; // index into vector of vector of ASTList
 const ASTIndex AST_NULL = 0; // Null points to the root
 
 // TODO: change all of this
 struct AST {
-//     struct ASTList {
-//         ASTIndex first;
-//         uint32_t numStmts;
-//     };
-    using ASTList = std::vector<ASTIndex>*;
-
 //     using StringView = std::string_view; // std::string_view is not trivial :(
     struct StringView {
         const char* buf;
@@ -175,32 +170,29 @@ struct AST {
     };
 
 
-
-    ASTKind kind;
-//     union {
-//         // TODO: flags ...
-//     };
-    TokenIndex tokenIdx; // Optional. Used for identifiers
-    // 8 bytes
-
     union {
         ASTProgram program;
-
         ASTProcedure proc;
-
         ASTBinaryOperator binaryOp;
         ASTUnaryOperator unaryOp;
         ASTLiteral literal;
         ASTLValue lvalue;
         ASTCall call;
-
         ASTIf ifstmt;
         ASTFor forstmt;
         ASTDefinition defn;
         ASTAssign asgn;
-
         ASTReturn ret;
     };
+
+//     uint8_t flags1;
+//     uint8_t flags2;
+//     uint8_t flags3;
+//     union {
+//         // TODO: flags ...
+//     };
+    TokenIndex tokenIdx; // Optional. Used for identifiers
+    ASTKind kind;
 };
 
 
@@ -209,10 +201,11 @@ struct Parser {
     std::vector<Token> tokens;
     TokenIndex tokenIdx;
     std::vector<AST>* mem;
+    std::vector<std::vector<ASTIndex>> indices;
 };
 
 std::vector<AST> ParseEntireProgram(Parser& parser);
 
 static_assert(std::is_trivial_v<AST>);
-static_assert(sizeof(AST) <= 32);
+static_assert(sizeof(AST) == 24);
 
