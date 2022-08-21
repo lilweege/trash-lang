@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vector>
 
-enum class TokenKind {
+enum class TokenKind : uint8_t {
     NONE,
     COMMENT,
     SEMICOLON,
@@ -52,7 +52,7 @@ enum class TokenKind {
     TOKEN_COUNT
 };
 
-enum class TokenizerError {
+enum class TokenizerError : uint8_t {
     NONE,
     EMPTY,
     FAIL,
@@ -64,13 +64,13 @@ struct TokenizerResult {
 };
 
 struct FileLocation {
-    uint32_t line, col;
+    size_t line, col, idx;
 };
 
 struct Token {
-    TokenKind kind;
     std::string_view text;
     FileLocation pos;
+    TokenKind kind;
 };
 
 struct Tokenizer {

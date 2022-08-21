@@ -108,8 +108,15 @@ void CompilerMain(int argc, char** argv) {
     Compiler compiler{};
     compiler.options = ParseArguments(argc, argv);
     compiler.source = ReadEntireFile(compiler.options.srcFn);
-    Tokenizer tokenizer{ .filename = compiler.options.srcFn, .source = compiler.source };
-    Parser parser{ .filename = compiler.options.srcFn, .tokens = TokenizeEntireSource(tokenizer) };
+    Tokenizer tokenizer{
+        .filename = compiler.options.srcFn,
+        .source = compiler.source
+    };
+    Parser parser{
+        .filename = compiler.options.srcFn,
+        .source = compiler.source,
+        .tokens = TokenizeEntireSource(tokenizer)
+    };
     compiler.ast = ParseEntireProgram(parser);
     fmt::print(stderr, "DONE!\n");
 }

@@ -172,7 +172,8 @@ static AST& GetAST(const Parser& parser, ASTIndex idx) {
 }
 
 #define CompileErrorAt(parser, token, format) do { \
-        CompileErrorMessage((parser).filename, (token).pos.line, (token).pos.col, format); \
+        fmt::print(stderr, "{}\n", CompileErrorMessage((parser).filename, (token).pos.line, (token).pos.col, \
+            (parser).source, (token).pos.idx, format)); \
         exit(1); \
     } while (0)
 
@@ -679,7 +680,7 @@ std::vector<AST> ParseEntireProgram(Parser& parser) {
     PRINT_SIZE(AST::ASTAssign);
     PRINT_SIZE(AST::ASTReturn);
     PRINT_SIZE(AST);
-    return {};
+    // return {};
     std::vector<AST> ast;
     parser.mem = &ast;
     parser.tokenIdx = 1;

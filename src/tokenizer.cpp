@@ -56,7 +56,7 @@ const char* TokenKindName(TokenKind kind) {
     return TokenKindNames[static_cast<uint32_t>(kind)];
 }
 
-static void LeftTrim(Tokenizer& tokenizer, uint32_t* outLineNo, uint32_t* outColNo) {
+static void LeftTrim(Tokenizer& tokenizer, size_t* outLineNo, size_t* outColNo) {
     for (;
         tokenizer.sourceIdx < tokenizer.source.size();
         ++tokenizer.sourceIdx)
@@ -89,7 +89,8 @@ static std::string_view LeftChop(Tokenizer& tokenizer, size_t n) {
 }
 
 static std::string_view LeftChopWhile(Tokenizer& tokenizer, auto predicate) {
-    const auto* begin = tokenizer.source.cbegin() + static_cast<long>(tokenizer.sourceIdx);
+    // FIXME: narrowing conversion?
+    const auto* begin = tokenizer.source.cbegin() + tokenizer.sourceIdx;
     const auto* end = std::find_if(begin, tokenizer.source.cend(), [&predicate](char c) { return !predicate(c); } );
     tokenizer.sourceIdx += static_cast<size_t> (end - begin);
     return std::string_view{begin, end};
@@ -119,6 +120,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
             if (commentEnd == std::string::npos) {
                 // no newline implies end of file
                 tokenizer.curToken.text = std::string_view{&tokenizer.source[tokenizer.sourceIdx]};
+                tokenizer.curToken.pos.idx = tokenizer.sourceIdx;
                 tokenizer.sourceIdx = tokenizer.source.size();
 
                 tokenizer.curToken.pos.line = tokenizer.curPos.line + 1;
@@ -126,6 +128,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                 tokenizer.curPos.col += tokenizer.curToken.text.size();
                 return { .err = TokenizerError::NONE };
             }
+            tokenizer.curToken.pos.idx = tokenizer.sourceIdx;
             tokenizer.curToken.text = LeftChop(tokenizer, commentEnd-tokenizer.sourceIdx);
             tokenizer.curToken.pos.line = tokenizer.curPos.line + 1;
             tokenizer.curToken.pos.col = tokenizer.curPos.col + 1;
@@ -153,6 +156,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
         };
     };
 
+    tokenizer.curToken.pos.idx = tokenizer.sourceIdx;
     char curChar = tokenizer.source[tokenizer.sourceIdx];
     switch (curChar) {
         case ';': {

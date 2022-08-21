@@ -198,6 +198,7 @@ struct AST {
 
 struct Parser {
     std::string_view filename;
+    std::string_view source;
     std::vector<Token> tokens;
     TokenIndex tokenIdx;
     std::vector<AST>* mem;
