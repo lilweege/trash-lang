@@ -62,7 +62,7 @@ static void LeftTrim(Tokenizer& tokenizer, uint32_t* outLineNo, uint32_t* outCol
         ++tokenizer.sourceIdx)
     {
         char ch = tokenizer.source[tokenizer.sourceIdx];
-        if (!(ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t')) {
+        if (!IsWhitespace(ch)) {
             break;
         }
         if (outLineNo != nullptr) {
@@ -148,7 +148,8 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                 tokenizer.filename,
                 tokenizer.curPos.line + 1,
                 tokenizer.curPos.col + 1,
-                "\"{}\" is not implemented yet", token),
+                tokenizer.source, tokenizer.sourceIdx,
+                "\"{}\" is not implemented yet", token)
         };
     };
 
@@ -311,6 +312,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
         case '"': {
             char delim = LeftChop(tokenizer, 1)[0];
             size_t idx = 0;
+            FileLocation strStart = { .line = tokenizer.curPos.line + 1, .col = tokenizer.curPos.col + 1, };
             for (idx = tokenizer.sourceIdx;
                 idx < tokenizer.source.size();
                 ++idx)
@@ -322,9 +324,8 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                     return {
                         .err = TokenizerError::FAIL,
                         .msg = CompileErrorMessage(
-                            tokenizer.filename,
-                            tokenizer.curPos.line + 1,
-                            tokenizer.curPos.col + 1,
+                            tokenizer.filename, strStart.line, strStart.col,
+                            tokenizer.source, tokenizer.sourceIdx,
                             "Unexpected end of line in string literal"),
                     };
                 }
@@ -342,17 +343,18 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                                 tokenizer.filename,
                                 tokenizer.curPos.line + 1,
                                 tokenizer.curPos.col + idx - tokenizer.sourceIdx + 1,
-                                "Invalid escape sequence"),
+                                tokenizer.source, tokenizer.sourceIdx,
+                                "Invalid escape character \"\\{}\"", escapeChar),
                         };
                     }
                 }
             }
-            FileLocation strStart = { .line = tokenizer.curPos.line + 1, .col = tokenizer.curPos.col + 1, };
             if (idx >= tokenizer.source.size()) {
                 return {
                     .err = TokenizerError::FAIL,
                     .msg = CompileErrorMessage(
                         tokenizer.filename, strStart.line, strStart.col,
+                        tokenizer.source, tokenizer.sourceIdx,
                         "Unexpected end of file in string literal"),
                 };
             }
@@ -367,6 +369,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
                         .err = TokenizerError::FAIL,
                         .msg = CompileErrorMessage(
                             tokenizer.filename, strStart.line, strStart.col,
+                            tokenizer.source, tokenizer.sourceIdx,
                             "Max length of character literal exceeded"),
                     };
                 }
