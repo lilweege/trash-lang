@@ -4,7 +4,7 @@
 #include <cassert>
 #include <algorithm>
 #include <array>
-#include <iostream>
+#include <functional>
 
 const char* TokenKindName(TokenKind kind) {
     static_assert(static_cast<uint32_t>(TokenKind::TOKEN_COUNT) == 43, "Exhaustive check of token kinds failed");
@@ -88,10 +88,10 @@ static std::string_view LeftChop(Tokenizer& tokenizer, size_t n) {
     return view;
 }
 
-static std::string_view LeftChopWhile(Tokenizer& tokenizer, auto predicate) {
+static std::string_view LeftChopWhile(Tokenizer& tokenizer, auto&& predicate) {
     // FIXME: narrowing conversion?
     const auto* begin = tokenizer.source.cbegin() + tokenizer.sourceIdx;
-    const auto* end = std::find_if(begin, tokenizer.source.cend(), [&predicate](char c) { return !predicate(c); } );
+    const auto* end = std::find_if(begin, tokenizer.source.cend(), std::not_fn(predicate));
     tokenizer.sourceIdx += static_cast<size_t> (end - begin);
     return std::string_view{begin, end};
 }
@@ -286,7 +286,7 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
 
         case '>': {
             // TODO: right shift
-            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() ||
+            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() &&
                 tokenizer.source[tokenizer.sourceIdx + 1] == '=')
             {
                 tokenizer.curToken.kind = TokenKind::OPERATOR_GE;
