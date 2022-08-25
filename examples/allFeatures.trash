@@ -4,7 +4,7 @@
 
 proc primes(let i64 N) {
     mut u8[N] sieve;
-    for (let i64 i = 0; i < N; i = i + 1)
+    for (mut i64 i = 0; i < N; i = i + 1)
         sieve[i] = 0;
 
     let i64 root = sqrt(N);
@@ -78,3 +78,5 @@ proc entry() {
 }
 
 ? EOF
+
+

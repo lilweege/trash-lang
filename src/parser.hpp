@@ -84,15 +84,21 @@ enum class TypeKind : uint8_t {
     U8,
     I64,
     F64,
+
+    // ...
+    COUNT
 };
+const char* TypeKindName(TypeKind kind);
 
-
+// TODO: strong types
 using TokenIndex = uint32_t;
 using ASTIndex = uint32_t;
 using ASTList = uint32_t; // index into vector of vector of ASTList
+const TokenIndex TOKEN_NULL = 0;
 const ASTIndex AST_NULL = 0; // Null points to the root
+const ASTList AST_EMPTY = 0;
 
-// TODO: change all of this
+
 struct AST {
 //     using StringView = std::string_view; // std::string_view is not trivial :(
     struct StringView {
@@ -161,8 +167,8 @@ struct AST {
 
     struct ASTAssign {
         // Access ident through token
-        ASTIndex subscript; // Optional
-        ASTIndex expession;
+        ASTIndex lvalue;
+        ASTIndex rvalue;
     };
 
     struct ASTReturn {
