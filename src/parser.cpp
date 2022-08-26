@@ -106,12 +106,6 @@ static const Token& PollCurrentToken(Parser& parser) {
         if (token.kind != expectedKind) \
             CompileErrorAt(parser, token, format __VA_OPT__(,) __VA_ARGS__); \
     } while (0)
-#define ExpectAndConsumeTokens(parser, predicate, format, ...) do { \
-        const Token& token = PollCurrentToken(parser); \
-        if (!predicate(token)) \
-            CompileErrorAt(parser, token, format __VA_OPT__(,) __VA_ARGS__); \
-    } while (0)
-
 
 static ASTList NewASTList(Parser& parser) {
     parser.indices.emplace_back();
@@ -297,12 +291,6 @@ static void PrintAST(const Parser& parser, ASTIndex rootIdx = AST_NULL, uint32_t
 }
 
 
-
-
-
-
-
-
 static ASTIndex ParseExpression(Parser& parser);
 static ASTIndex ParseBody(Parser& parser);
 
@@ -316,7 +304,8 @@ static ASTIndex ParseSubscript(Parser& parser) {
     ASTIndex subscript = ParseExpression(parser);
     if (subscript == AST_NULL)
         CompileErrorAt(parser, lsquare, "Invalid subscript, expected expression after \"[\"");
-    ExpectAndConsumeToken(parser, TokenKind::RSQUARE, "Missing matching closing square bracket");
+    if (PollCurrentToken(parser).kind != TokenKind::RSQUARE)
+        CompileErrorAt(parser, lsquare, "Unmatched square bracket");
     
     return subscript;
 }
@@ -396,14 +385,16 @@ static ASTIndex ParseIf(Parser& parser) {
     ++parser.tokenIdx;
     ASTIndex ifStmt = NewNodeFromLastToken(parser, ASTKind::IF_STATEMENT);
 
-    ExpectAndConsumeToken(parser, TokenKind::LPAREN, "Expected \"(\" after \"if\"");
+    const Token& lparen = PollCurrentToken(parser);
+    if (lparen.kind != TokenKind::LPAREN)
+        CompileErrorAt(parser, lparen, "Expected \"(\" after \"if\"");
     ASTIndex cond = ParseExpression(parser);
     if (cond == AST_NULL)
         CompileErrorAt(parser, PeekCurrentToken(parser), "Invalid expression after \"(\"");
     GetAST(parser, ifStmt).ifstmt.cond = cond;
 
-    ExpectAndConsumeToken(parser, TokenKind::RPAREN, "Expected \")\" after if statement condition");
-
+    if (PollCurrentToken(parser).kind != TokenKind::RPAREN)
+        CompileErrorAt(parser, lparen, "Unmatched parenthesis after \"if\" statement");
     GetAST(parser, ifStmt).ifstmt.body = ParseBody(parser);
 
     // Parse optional else
@@ -514,7 +505,9 @@ static ASTIndex ParseFor(Parser& parser) {
     ++parser.tokenIdx;
     ASTIndex forStmt = NewNodeFromLastToken(parser, ASTKind::FOR_STATEMENT);
 
-    ExpectAndConsumeToken(parser, TokenKind::LPAREN, "Expected \"(\" after \"for\"");
+    const Token& lparen = PollCurrentToken(parser);
+    if (lparen.kind != TokenKind::LPAREN)
+        CompileErrorAt(parser, lparen, "Expected \"(\" after \"for\"");
     ASTIndex init = ParseVarDefnAsgn(parser);
     if (init == AST_NULL) {
         const Token& semi = PeekCurrentToken(parser);
@@ -539,7 +532,8 @@ static ASTIndex ParseFor(Parser& parser) {
         if (rparen.kind != TokenKind::RPAREN)
             CompileErrorAt(parser, rparen, "Invalid assignment");
     }
-    ExpectAndConsumeToken(parser, TokenKind::RPAREN, "Expected \")\" after for statement increment");
+    if (PollCurrentToken(parser).kind != TokenKind::RPAREN)
+        CompileErrorAt(parser, lparen, "Unmatched parenthesis after \"for\" statement");
     GetAST(parser, forStmt).forstmt.incr = incr;
 
     GetAST(parser, forStmt).forstmt.body = ParseBody(parser);
@@ -605,7 +599,8 @@ static ASTIndex ParseFactor(Parser& parser) {
         ASTIndex expr = ParseExpression(parser);
         if (expr == AST_NULL)
             CompileErrorAt(parser, tok, "Expected expression after \"(\"");
-        ExpectAndConsumeToken(parser, TokenKind::RPAREN, "Unmatched parentheses"); // FIXME: error at previous token. not current. Change exprecttoken to take error token
+        if (PollCurrentToken(parser).kind != TokenKind::RPAREN)
+            CompileErrorAt(parser, tok, "Unmatched parenthesis");
         return expr;
     }
     else if (tok.kind == TokenKind::IDENTIFIER) {
@@ -799,17 +794,13 @@ static ASTIndex ParseStatement(Parser& parser) {
 
     // If all else failed, try parse ParseExpression
     ASTIndex expr = ParseExpression(parser);
-    if (expr == AST_NULL) {
-        PrintToken(PollCurrentToken(parser));
-        fmt::print(stderr, "\n");
-    }
-    assert(expr != AST_NULL);
+    if (expr == AST_NULL)
+        CompileErrorAt(parser, tok, "Invalid statement");
     ExpectAndConsumeToken(parser, TokenKind::SEMICOLON, "Expected semicolon after expression");
     return expr;
 }
 
 static ASTList ParseBody(Parser& parser) {
-    // TODO: error handling
     const Token& maybeCurly = PeekCurrentToken(parser);
     ASTList body = NewASTList(parser);
 
@@ -824,18 +815,14 @@ static ASTList ParseBody(Parser& parser) {
             }
 
             ASTIndex stmt = ParseStatement(parser);
-            if (stmt == AST_NULL)
-                CompileErrorAt(parser, PeekCurrentToken(parser), "SOMETHING WENT WRONG");
-
+            assert(stmt != AST_NULL);
             AddToASTList(parser, body, stmt);
         }
     }
     else {
         // Parse single statement
         ASTIndex stmt = ParseStatement(parser);
-        if (stmt == AST_NULL)
-            CompileErrorAt(parser, PeekCurrentToken(parser), "SOMETHING WENT WRONG");
-
+        assert(stmt != AST_NULL);
         AddToASTList(parser, body, stmt);
     }
     return body;
@@ -902,14 +889,8 @@ static void ParseProgram(Parser& parser) {
     ASTIndex allProcs = NewASTList(parser);
     while (parser.tokenIdx < parser.tokens.size()) {
         ASTIndex proc = ParseProcedure(parser);
-        // TODO: error handling
-        if (proc == AST_NULL) {
-            fmt::print(stderr, "SOMETHING WENT WRONG");
-            return;
-        }
-        else {
-            AddToASTList(parser, allProcs, proc);
-        }
+        assert(proc != AST_NULL);
+        AddToASTList(parser, allProcs, proc);
     }
     (*parser.mem)[0].program.procedures = allProcs;
 }
