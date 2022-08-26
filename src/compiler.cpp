@@ -67,14 +67,17 @@ static CompilerOptions ParseArguments(int argc, char** argv) {
 }
 
 static std::string ReadEntireFile(const std::string& filename) {
-    std::ifstream sourceStream{filename, std::ios::in | std::ios::binary};
+    std::ifstream sourceStream{filename, std::ios::in | std::ios::binary | std::ios::ate};
     if (!sourceStream) {
         fmt::print(stderr, "Error: Could not open file \"{}\".\n", filename);
         exit(1);
     }
-
-    // FIXME: This is slow
-    return std::string{std::istreambuf_iterator<char>{sourceStream}, {}};
+    std::string contents;
+    contents.resize(sourceStream.tellg());
+    sourceStream.seekg(0, std::ios::beg);
+    sourceStream.read(&contents[0], contents.size());
+    sourceStream.close();
+    return contents;
 }
 
 static std::vector<Token> TokenizeEntireSource(Tokenizer& tokenizer) {
