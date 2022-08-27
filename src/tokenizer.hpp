@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <fstream>
 
 enum class TokenKind : uint8_t {
     NONE,
@@ -51,6 +52,7 @@ enum class TokenKind : uint8_t {
     // ...
     TOKEN_COUNT
 };
+const char* TokenKindName(TokenKind kind);
 
 enum class TokenizerError : uint8_t {
     NONE,
@@ -73,17 +75,23 @@ struct Token {
     TokenKind kind;
 };
 
-struct Tokenizer {
+class Tokenizer {
     std::string_view filename;
     std::string_view source;
-    size_t sourceIdx;
-    Token curToken;
-    FileLocation curPos;
+    size_t sourceIdx{};
+    FileLocation curPos{};
     std::vector<Token> tokens;
+
+public:
+    Token curToken;
+
+    Tokenizer(std::string_view filename_, std::string_view source_)
+        : filename{filename_}, source{source_} {}
+
+    TokenizerResult PollToken();
+    TokenizerResult PollTokenWithComments();
+    void ConsumeToken();
 };
 
-
-const char* TokenKindName(TokenKind kind);
-TokenizerResult PollToken(Tokenizer& tokenizer);
-void ConsumeToken(Tokenizer& tokenizer);
 bool TokenizeOK(const TokenizerResult& result);
+void PrintToken(const Token& token, FILE* stream = stderr);

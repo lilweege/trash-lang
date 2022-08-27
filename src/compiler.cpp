@@ -15,13 +15,6 @@ struct CompilerOptions {
     // ...
 };
 
-struct Compiler {
-    CompilerOptions options;
-    std::string source;
-    std::vector<Token> tokens;
-    std::vector<AST> ast; // NOTE: these are not pointers, nodes live here
-};
-
 static void PrintUsage() {
     std::vector<std::pair<char, std::string>> options;
     fmt::print(stderr,
@@ -89,8 +82,8 @@ static std::vector<Token> TokenizeEntireSource(Tokenizer& tokenizer) {
     tokens.emplace_back(); // Reserved empty token
 
     while (true) {
-        ConsumeToken(tokenizer);
-        TokenizerResult result = PollToken(tokenizer);
+        tokenizer.ConsumeToken();
+        TokenizerResult result = tokenizer.PollToken();
         if (result.err == TokenizerError::FAIL) {
             fmt::print(stderr, "{}\n", result.msg);
             exit(1);
@@ -104,23 +97,14 @@ static std::vector<Token> TokenizeEntireSource(Tokenizer& tokenizer) {
     return tokens;
 }
 
-
 void CompilerMain(int argc, char** argv) {
     assert(argc > 0);
 
-    Compiler compiler{};
-    compiler.options = ParseArguments(argc, argv);
-    compiler.source = ReadEntireFile(compiler.options.srcFn);
-    Tokenizer tokenizer{
-        .filename = compiler.options.srcFn,
-        .source = compiler.source
-    };
-    Parser parser{
-        .filename = compiler.options.srcFn,
-        .source = compiler.source,
-        .tokens = TokenizeEntireSource(tokenizer)
-    };
-    compiler.ast = ParseEntireProgram(parser);
+    CompilerOptions options{ ParseArguments(argc, argv) };
+    std::string source{ ReadEntireFile(options.srcFn) };
+    Tokenizer tokenizer{ options.srcFn, source };
+    Parser parser{ options.srcFn, source, TokenizeEntireSource(tokenizer) };
+    // TODO: typecheck and analyze
+    // TODO: generate code
     fmt::print(stderr, "DONE!\n");
 }
-

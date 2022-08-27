@@ -3,6 +3,7 @@
 #include "tokenizer.hpp"
 
 #include <vector>
+#include <cassert>
 
 // Language Grammar
 // TODO: bitwise operators, pointers, struct
@@ -202,17 +203,55 @@ struct AST {
 };
 
 
-struct Parser {
+class Parser {
     std::string_view filename;
     std::string_view source;
     std::vector<Token> tokens;
     TokenIndex tokenIdx;
-    std::vector<AST>* mem;
+    std::vector<AST> tree;
     std::vector<std::vector<ASTIndex>> indices;
+
+    ASTIndex NewNode(ASTKind kind);
+    ASTIndex NewNodeFromToken(TokenIndex tokenIdx, ASTKind kind);
+    ASTIndex NewNodeFromLastToken(ASTKind kind);
+    const Token& PeekCurrentToken() const;
+    const Token& PollCurrentToken();
+    ASTList NewASTList();
+    void AddToASTList(ASTList list, ASTIndex idx);
+
+    void PrintNode(ASTIndex rootIdx) const;
+    void PrintAST(ASTIndex rootIdx, uint32_t depth) const;
+    ASTIndex ParseSubscript();
+    std::pair<TypeKind, ASTIndex> ParseType();
+    ASTIndex ParseVarDefn();
+    ASTIndex ParseVarDefnAsgn();
+    ASTIndex ParseIf();
+    ASTIndex ParseCall();
+    ASTIndex ParseLValue();
+    ASTIndex ParseAssignment();
+    ASTIndex ParseFor();
+    ASTIndex ParseFactor();
+    ASTIndex ParseTerm();
+    ASTIndex ParseValue();
+    ASTIndex ParseComparison();
+    ASTIndex ParseLogicalFactor();
+    ASTIndex ParseLogicalTerm();
+    ASTIndex ParseExpression();
+    ASTIndex ParseStatement();
+    ASTList ParseBody();
+    ASTIndex ParseProcedure();
+    void ParseProgram();
+
+    void ParseEntireProgram();
+
+public:
+    Parser(std::string_view filename_, std::string_view source_, std::vector<Token> tokens_)
+        : filename{filename_}, source{source_}, tokens{std::move(tokens_)}
+    {
+        ParseEntireProgram();
+    }
 };
 
-std::vector<AST> ParseEntireProgram(Parser& parser);
 
 static_assert(std::is_trivial_v<AST>);
 static_assert(sizeof(AST) == 24);
-

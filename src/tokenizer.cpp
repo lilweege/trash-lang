@@ -56,12 +56,12 @@ const char* TokenKindName(TokenKind kind) {
     return TokenKindNames[static_cast<uint32_t>(kind)];
 }
 
-static void LeftTrim(Tokenizer& tokenizer, size_t* outLineNo, size_t* outColNo) {
+static void LeftTrim(std::string_view source, size_t& sourceIdx, size_t* outLineNo = nullptr, size_t* outColNo = nullptr) {
     for (;
-        tokenizer.sourceIdx < tokenizer.source.size();
-        ++tokenizer.sourceIdx)
+        sourceIdx < source.size();
+        ++sourceIdx)
     {
-        char ch = tokenizer.source[tokenizer.sourceIdx];
+        char ch = source[sourceIdx];
         if (!IsWhitespace(ch)) {
             break;
         }
@@ -81,189 +81,188 @@ static void LeftTrim(Tokenizer& tokenizer, size_t* outLineNo, size_t* outColNo) 
     }
 }
 
-
-static std::string_view LeftChop(Tokenizer& tokenizer, size_t n) {
-    std::string_view view{&tokenizer.source[tokenizer.sourceIdx], n};
-    tokenizer.sourceIdx += n;
+static std::string_view LeftChop(std::string_view source, size_t& sourceIdx, size_t n) {
+    std::string_view view{&source[sourceIdx], n};
+    sourceIdx += n;
     return view;
 }
 
-static std::string_view LeftChopWhile(Tokenizer& tokenizer, auto&& predicate) {
+static std::string_view LeftChopWhile(std::string_view source, size_t& sourceIdx, auto&& predicate) {
     // FIXME: narrowing conversion?
-    const auto* begin = tokenizer.source.cbegin() + tokenizer.sourceIdx;
-    const auto* end = std::find_if(begin, tokenizer.source.cend(), std::not_fn(predicate));
-    tokenizer.sourceIdx += static_cast<size_t> (end - begin);
+    const auto* begin = source.cbegin() + sourceIdx;
+    const auto* end = std::find_if(begin, source.cend(), std::not_fn(predicate));
+    sourceIdx += static_cast<size_t> (end - begin);
     return std::string_view{begin, end};
 }
 
-static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
-    if (tokenizer.curToken.kind != TokenKind::NONE) {
+TokenizerResult Tokenizer::PollTokenWithComments() {
+    if (curToken.kind != TokenKind::NONE) {
         return { .err = TokenizerError::NONE };
     }
 
     size_t lineDiff = 0, colDiff = 0;
     do {
         // whitespace
-        size_t linesBefore = tokenizer.curPos.line;
-        size_t colsBefore = tokenizer.curPos.col;
-        LeftTrim(tokenizer, &tokenizer.curPos.line, &tokenizer.curPos.col);
+        size_t linesBefore = curPos.line;
+        size_t colsBefore = curPos.col;
+        LeftTrim(source, sourceIdx, &curPos.line, &curPos.col);
 
         // line comment beginning with '?'
-        if (tokenizer.sourceIdx >= tokenizer.source.size()) {
+        if (sourceIdx >= source.size()) {
             break;
         }
-        char curChar = tokenizer.source[tokenizer.sourceIdx];
+        char curChar = source[sourceIdx];
         if (curChar == '?') {
             // it is a comment
-            tokenizer.curToken.kind = TokenKind::COMMENT;
-            size_t commentEnd = tokenizer.source.find_first_of('\n', tokenizer.sourceIdx);
+            curToken.kind = TokenKind::COMMENT;
+            size_t commentEnd = source.find_first_of('\n', sourceIdx);
             if (commentEnd == std::string::npos) {
                 // no newline implies end of file
-                tokenizer.curToken.text = std::string_view{&tokenizer.source[tokenizer.sourceIdx]};
-                tokenizer.curToken.pos.idx = tokenizer.sourceIdx;
-                tokenizer.sourceIdx = tokenizer.source.size();
+                curToken.text = std::string_view{&source[sourceIdx]};
+                curToken.pos.idx = sourceIdx;
+                sourceIdx = source.size();
 
-                tokenizer.curToken.pos.line = tokenizer.curPos.line + 1;
-                tokenizer.curToken.pos.col = tokenizer.curPos.col + 1;
-                tokenizer.curPos.col += tokenizer.curToken.text.size();
+                curToken.pos.line = curPos.line + 1;
+                curToken.pos.col = curPos.col + 1;
+                curPos.col += curToken.text.size();
                 return { .err = TokenizerError::NONE };
             }
-            tokenizer.curToken.pos.idx = tokenizer.sourceIdx;
-            tokenizer.curToken.text = LeftChop(tokenizer, commentEnd-tokenizer.sourceIdx);
-            tokenizer.curToken.pos.line = tokenizer.curPos.line + 1;
-            tokenizer.curToken.pos.col = tokenizer.curPos.col + 1;
-            tokenizer.curPos.col += tokenizer.curToken.text.size();
+            curToken.pos.idx = sourceIdx;
+            curToken.text = LeftChop(source, sourceIdx, commentEnd-sourceIdx);
+            curToken.pos.line = curPos.line + 1;
+            curToken.pos.col = curPos.col + 1;
+            curPos.col += curToken.text.size();
             return { .err = TokenizerError::NONE };
         }
 
-        lineDiff = tokenizer.curPos.line - linesBefore;
-        colDiff = tokenizer.curPos.col - colsBefore;
+        lineDiff = curPos.line - linesBefore;
+        colDiff = curPos.col - colsBefore;
     } while (lineDiff != 0 || colDiff != 0);
 
-    if (tokenizer.sourceIdx >= tokenizer.source.size()) {
+    if (sourceIdx >= source.size()) {
         return { .err = TokenizerError::EMPTY };
     }
 
-    auto TokenUnimplemnted = [&tokenizer](std::string_view token) -> TokenizerResult {
+    auto TokenUnimplemnted = [&](std::string_view token) -> TokenizerResult {
         return {
             .err = TokenizerError::FAIL,
             .msg = CompileErrorMessage(
-                tokenizer.filename,
-                tokenizer.curPos.line + 1,
-                tokenizer.curPos.col + 1,
-                tokenizer.source, tokenizer.sourceIdx,
+                filename,
+                curPos.line + 1,
+                curPos.col + 1,
+                source, sourceIdx,
                 "\"{}\" is not implemented yet", token)
         };
     };
 
-    tokenizer.curToken.pos.idx = tokenizer.sourceIdx;
-    char curChar = tokenizer.source[tokenizer.sourceIdx];
+    curToken.pos.idx = sourceIdx;
+    char curChar = source[sourceIdx];
     switch (curChar) {
         case ';': {
-            tokenizer.curToken.kind = TokenKind::SEMICOLON;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::SEMICOLON;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '(': {
-            tokenizer.curToken.kind = TokenKind::LPAREN;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::LPAREN;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case ')': {
-            tokenizer.curToken.kind = TokenKind::RPAREN;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::RPAREN;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '{': {
-            tokenizer.curToken.kind = TokenKind::LCURLY;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::LCURLY;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '}': {
-            tokenizer.curToken.kind = TokenKind::RCURLY;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::RCURLY;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '[': {
-            tokenizer.curToken.kind = TokenKind::LSQUARE;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::LSQUARE;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case ']': {
-            tokenizer.curToken.kind = TokenKind::RSQUARE;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::RSQUARE;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '+': {
-            tokenizer.curToken.kind = TokenKind::OPERATOR_POS;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::OPERATOR_POS;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '-': {
-            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() &&
-                tokenizer.source[tokenizer.sourceIdx + 1] == '>')
+            if (sourceIdx + 1 < source.size() &&
+                source[sourceIdx + 1] == '>')
             {
-                tokenizer.curToken.kind = TokenKind::ARROW;
-                tokenizer.curToken.text = LeftChop(tokenizer, 2);
+                curToken.kind = TokenKind::ARROW;
+                curToken.text = LeftChop(source, sourceIdx, 2);
             }
             else {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_NEG;
-                tokenizer.curToken.text = LeftChop(tokenizer, 1);
+                curToken.kind = TokenKind::OPERATOR_NEG;
+                curToken.text = LeftChop(source, sourceIdx, 1);
             }
         } break;
 
         case '*': {
-            tokenizer.curToken.kind = TokenKind::OPERATOR_MUL;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::OPERATOR_MUL;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '/': {
-            tokenizer.curToken.kind = TokenKind::OPERATOR_DIV;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::OPERATOR_DIV;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '%': {
-            tokenizer.curToken.kind = TokenKind::OPERATOR_MOD;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::OPERATOR_MOD;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case ',': {
-            tokenizer.curToken.kind = TokenKind::OPERATOR_COMMA;
-            tokenizer.curToken.text = LeftChop(tokenizer, 1);
+            curToken.kind = TokenKind::OPERATOR_COMMA;
+            curToken.text = LeftChop(source, sourceIdx, 1);
         } break;
 
         case '=': {
-            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() &&
-                tokenizer.source[tokenizer.sourceIdx + 1] == '=')
+            if (sourceIdx + 1 < source.size() &&
+                source[sourceIdx + 1] == '=')
             {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_EQ;
-                tokenizer.curToken.text = LeftChop(tokenizer, 2);
+                curToken.kind = TokenKind::OPERATOR_EQ;
+                curToken.text = LeftChop(source, sourceIdx, 2);
             }
             else {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_ASSIGN;
-                tokenizer.curToken.text = LeftChop(tokenizer, 1);
+                curToken.kind = TokenKind::OPERATOR_ASSIGN;
+                curToken.text = LeftChop(source, sourceIdx, 1);
             }
         } break;
 
         case '!': {
-            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() &&
-                tokenizer.source[tokenizer.sourceIdx + 1] == '=')
+            if (sourceIdx + 1 < source.size() &&
+                source[sourceIdx + 1] == '=')
             {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_NE;
-                tokenizer.curToken.text = LeftChop(tokenizer, 2);
+                curToken.kind = TokenKind::OPERATOR_NE;
+                curToken.text = LeftChop(source, sourceIdx, 2);
             }
             else {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_NOT;
-                tokenizer.curToken.text = LeftChop(tokenizer, 1);
+                curToken.kind = TokenKind::OPERATOR_NOT;
+                curToken.text = LeftChop(source, sourceIdx, 1);
             }
         } break;
 
         case '&': {
-            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() &&
-                tokenizer.source[tokenizer.sourceIdx + 1] == '&')
+            if (sourceIdx + 1 < source.size() &&
+                source[sourceIdx + 1] == '&')
             {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_AND;
-                tokenizer.curToken.text = LeftChop(tokenizer, 2);
+                curToken.kind = TokenKind::OPERATOR_AND;
+                curToken.text = LeftChop(source, sourceIdx, 2);
             }
             else {
                 // TODO: bitwise and
@@ -272,11 +271,11 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
         } break;
 
         case '|': {
-            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() &&
-                tokenizer.source[tokenizer.sourceIdx + 1] == '|')
+            if (sourceIdx + 1 < source.size() &&
+                source[sourceIdx + 1] == '|')
             {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_OR;
-                tokenizer.curToken.text = LeftChop(tokenizer, 2);
+                curToken.kind = TokenKind::OPERATOR_OR;
+                curToken.text = LeftChop(source, sourceIdx, 2);
             }
             else {
                 // TODO: bitwise or
@@ -286,99 +285,99 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
 
         case '>': {
             // TODO: right shift
-            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() &&
-                tokenizer.source[tokenizer.sourceIdx + 1] == '=')
+            if (sourceIdx + 1 < source.size() &&
+                source[sourceIdx + 1] == '=')
             {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_GE;
-                tokenizer.curToken.text = LeftChop(tokenizer, 2);
+                curToken.kind = TokenKind::OPERATOR_GE;
+                curToken.text = LeftChop(source, sourceIdx, 2);
             }
             else {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_GT;
-                tokenizer.curToken.text = LeftChop(tokenizer, 1);
+                curToken.kind = TokenKind::OPERATOR_GT;
+                curToken.text = LeftChop(source, sourceIdx, 1);
             }
         } break;
 
         case '<': {
             // TODO: left shift
-            if (tokenizer.sourceIdx + 1 < tokenizer.source.size() &&
-                tokenizer.source[tokenizer.sourceIdx + 1] == '=')
+            if (sourceIdx + 1 < source.size() &&
+                source[sourceIdx + 1] == '=')
             {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_LE;
-                tokenizer.curToken.text = LeftChop(tokenizer, 2);
+                curToken.kind = TokenKind::OPERATOR_LE;
+                curToken.text = LeftChop(source, sourceIdx, 2);
             }
             else {
-                tokenizer.curToken.kind = TokenKind::OPERATOR_LT;
-                tokenizer.curToken.text = LeftChop(tokenizer, 1);
+                curToken.kind = TokenKind::OPERATOR_LT;
+                curToken.text = LeftChop(source, sourceIdx, 1);
             }
         } break;
 
         case '\'':
         case '"': {
-            char delim = LeftChop(tokenizer, 1)[0];
+            char delim = LeftChop(source, sourceIdx, 1)[0];
             size_t idx = 0;
-            FileLocation strStart = { .line = tokenizer.curPos.line + 1, .col = tokenizer.curPos.col + 1, };
-            for (idx = tokenizer.sourceIdx;
-                idx < tokenizer.source.size();
+            FileLocation strStart = { .line = curPos.line + 1, .col = curPos.col + 1, };
+            for (idx = sourceIdx;
+                idx < source.size();
                 ++idx)
             {
-                if (tokenizer.source[idx] == delim) {
+                if (source[idx] == delim) {
                     break;
                 }
-                if (tokenizer.source[idx] == '\n') {
+                if (source[idx] == '\n') {
                     return {
                         .err = TokenizerError::FAIL,
                         .msg = CompileErrorMessage(
-                            tokenizer.filename, strStart.line, strStart.col,
-                            tokenizer.source, tokenizer.sourceIdx,
+                            filename, strStart.line, strStart.col,
+                            source, sourceIdx,
                             "Unexpected end of line in string literal"),
                     };
                 }
-                if (tokenizer.source[idx] == '\\') {
-                    if (++idx >= tokenizer.source.size()) {
+                if (source[idx] == '\\') {
+                    if (++idx >= source.size()) {
                         break;
                     }
-                    char escapeChar = tokenizer.source[idx];
+                    char escapeChar = source[idx];
                     if (escapeChar != delim && escapeChar != '\n' &&
                         escapeChar != 'n' && escapeChar != 't' && escapeChar != '\\')
                     {
                         return {
                             .err = TokenizerError::FAIL,
                             .msg = CompileErrorMessage(
-                                tokenizer.filename,
-                                tokenizer.curPos.line + 1,
-                                tokenizer.curPos.col + idx - tokenizer.sourceIdx + 1,
-                                tokenizer.source, tokenizer.sourceIdx,
+                                filename,
+                                curPos.line + 1,
+                                curPos.col + idx - sourceIdx + 1,
+                                source, sourceIdx,
                                 "Invalid escape character \"\\{}\"", escapeChar),
                         };
                     }
                 }
             }
-            if (idx >= tokenizer.source.size()) {
+            if (idx >= source.size()) {
                 return {
                     .err = TokenizerError::FAIL,
                     .msg = CompileErrorMessage(
-                        tokenizer.filename, strStart.line, strStart.col,
-                        tokenizer.source, tokenizer.sourceIdx,
+                        filename, strStart.line, strStart.col,
+                        source, sourceIdx,
                         "Unexpected end of file in string literal"),
                 };
             }
-            tokenizer.curPos.col += 2; // quotes are not included in string literal token
-            tokenizer.curToken.kind = delim == '"' ? TokenKind::STRING_LITERAL : TokenKind::CHAR_LITERAL;
-            tokenizer.curToken.text = LeftChop(tokenizer, idx-tokenizer.sourceIdx);
-            if (tokenizer.curToken.kind == TokenKind::CHAR_LITERAL) {
-                if ((tokenizer.curToken.text.size() == 2 && tokenizer.curToken.text[0] != '\\') ||
-                    tokenizer.curToken.text.size() > 2)
+            curPos.col += 2; // quotes are not included in string literal token
+            curToken.kind = delim == '"' ? TokenKind::STRING_LITERAL : TokenKind::CHAR_LITERAL;
+            curToken.text = LeftChop(source, sourceIdx, idx-sourceIdx);
+            if (curToken.kind == TokenKind::CHAR_LITERAL) {
+                if ((curToken.text.size() == 2 && curToken.text[0] != '\\') ||
+                    curToken.text.size() > 2)
                 {
                     return {
                         .err = TokenizerError::FAIL,
                         .msg = CompileErrorMessage(
-                            tokenizer.filename, strStart.line, strStart.col,
-                            tokenizer.source, tokenizer.sourceIdx,
+                            filename, strStart.line, strStart.col,
+                            source, sourceIdx,
                             "Max length of character literal exceeded"),
                     };
                 }
             }
-            ++tokenizer.sourceIdx;
+            ++sourceIdx;
         } break;
 
         case '\\': return TokenUnimplemnted("\\");
@@ -391,31 +390,31 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
 
             if ((isalpha(curChar) != 0) || curChar == '_') {
                 // identifier or keyword
-                tokenizer.curToken.kind = TokenKind::IDENTIFIER;
-                tokenizer.curToken.text = LeftChopWhile(tokenizer, IsIdentifier);
-                if (tokenizer.curToken.text == "if")            tokenizer.curToken.kind = TokenKind::IF;
-                else if (tokenizer.curToken.text == "else")     tokenizer.curToken.kind = TokenKind::ELSE;
-                else if (tokenizer.curToken.text == "for")      tokenizer.curToken.kind = TokenKind::FOR;
-                else if (tokenizer.curToken.text == "u8")       tokenizer.curToken.kind = TokenKind::U8;
-                else if (tokenizer.curToken.text == "i64")      tokenizer.curToken.kind = TokenKind::I64;
-                else if (tokenizer.curToken.text == "f64")      tokenizer.curToken.kind = TokenKind::F64;
-                else if (tokenizer.curToken.text == "proc")     tokenizer.curToken.kind = TokenKind::PROC;
-                else if (tokenizer.curToken.text == "let")      tokenizer.curToken.kind = TokenKind::LET;
-                else if (tokenizer.curToken.text == "mut")      tokenizer.curToken.kind = TokenKind::MUT;
-                else if (tokenizer.curToken.text == "return")   tokenizer.curToken.kind = TokenKind::RETURN;
-                else if (tokenizer.curToken.text == "break")    tokenizer.curToken.kind = TokenKind::BREAK;
-                else if (tokenizer.curToken.text == "continue") tokenizer.curToken.kind = TokenKind::CONTINUE;
+                curToken.kind = TokenKind::IDENTIFIER;
+                curToken.text = LeftChopWhile(source, sourceIdx, IsIdentifier);
+                if (curToken.text == "if")            curToken.kind = TokenKind::IF;
+                else if (curToken.text == "else")     curToken.kind = TokenKind::ELSE;
+                else if (curToken.text == "for")      curToken.kind = TokenKind::FOR;
+                else if (curToken.text == "u8")       curToken.kind = TokenKind::U8;
+                else if (curToken.text == "i64")      curToken.kind = TokenKind::I64;
+                else if (curToken.text == "f64")      curToken.kind = TokenKind::F64;
+                else if (curToken.text == "proc")     curToken.kind = TokenKind::PROC;
+                else if (curToken.text == "let")      curToken.kind = TokenKind::LET;
+                else if (curToken.text == "mut")      curToken.kind = TokenKind::MUT;
+                else if (curToken.text == "return")   curToken.kind = TokenKind::RETURN;
+                else if (curToken.text == "break")    curToken.kind = TokenKind::BREAK;
+                else if (curToken.text == "continue") curToken.kind = TokenKind::CONTINUE;
             }
             else if (IsNumeric(curChar)) {
                 // integer literal
-                tokenizer.curToken.kind = TokenKind::INTEGER_LITERAL;
-                tokenizer.curToken.text = LeftChopWhile(tokenizer, IsNumeric);
+                curToken.kind = TokenKind::INTEGER_LITERAL;
+                curToken.text = LeftChopWhile(source, sourceIdx, IsNumeric);
                 // float literal
-                if (tokenizer.sourceIdx < tokenizer.source.size() && tokenizer.source[tokenizer.sourceIdx] == '.') {
-                    tokenizer.curToken.kind = TokenKind::FLOAT_LITERAL;
-                    ++tokenizer.sourceIdx;
-                    std::string_view mantissa = LeftChopWhile(tokenizer, IsNumeric);
-                    tokenizer.curToken.text = std::string_view{tokenizer.curToken.text.data(), tokenizer.curToken.text.size() + mantissa.size() + 1};
+                if (sourceIdx < source.size() && source[sourceIdx] == '.') {
+                    curToken.kind = TokenKind::FLOAT_LITERAL;
+                    ++sourceIdx;
+                    std::string_view mantissa = LeftChopWhile(source, sourceIdx, IsNumeric);
+                    curToken.text = std::string_view{curToken.text.data(), curToken.text.size() + mantissa.size() + 1};
                 }
             }
             else {
@@ -424,34 +423,35 @@ static TokenizerResult PollTokenWithComments(Tokenizer& tokenizer) {
         }
     }
 
-    assert(tokenizer.curToken.kind != TokenKind::NONE);
-    tokenizer.curToken.pos.line = tokenizer.curPos.line + 1;
-    tokenizer.curToken.pos.col = tokenizer.curPos.col + 1;
-    tokenizer.curPos.col += tokenizer.curToken.text.size();
+    assert(curToken.kind != TokenKind::NONE);
+    curToken.pos.line = curPos.line + 1;
+    curToken.pos.col = curPos.col + 1;
+    curPos.col += curToken.text.size();
 
     return { .err = TokenizerError::NONE };
 }
 
-TokenizerResult PollToken(Tokenizer& tokenizer) {
-    TokenizerResult res = PollTokenWithComments(tokenizer);
+TokenizerResult Tokenizer::PollToken() {
+    TokenizerResult res = PollTokenWithComments();
     if (res.err != TokenizerError::NONE)
         return res;
-    while (tokenizer.curToken.kind == TokenKind::COMMENT) {
-        tokenizer.curToken.kind = TokenKind::NONE;
-        res = PollTokenWithComments(tokenizer);
+    while (curToken.kind == TokenKind::COMMENT) {
+        curToken.kind = TokenKind::NONE;
+        res = PollTokenWithComments();
         if (res.err != TokenizerError::NONE)
             return res;
     }
     return res;
 }
 
+void Tokenizer::ConsumeToken() {
+    curToken.kind = TokenKind::NONE;
+}
+
 bool TokenizeOK(const TokenizerResult& result) {
     return result.err == TokenizerError::NONE;
 }
 
-void ConsumeToken(Tokenizer& tokenizer) {
-    tokenizer.curToken.kind = TokenKind::NONE;
+void PrintToken(const Token& token, FILE* stream) {
+    fmt::print(stream, "{}:{}:{}:\"{}\"", TokenKindName(token.kind), token.pos.line, token.pos.col, token.text);
 }
-
-
-
