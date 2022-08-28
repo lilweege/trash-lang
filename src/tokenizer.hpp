@@ -1,5 +1,7 @@
 #pragma once
 
+#include "compileerror.hpp"
+
 #include <string>
 #include <string_view>
 #include <vector>
@@ -76,8 +78,9 @@ struct Token {
 };
 
 class Tokenizer {
-    std::string_view filename;
-    std::string_view source;
+public:
+    const File file;
+private:
     size_t sourceIdx{};
     FileLocation curPos{};
     std::vector<Token> tokens;
@@ -85,8 +88,7 @@ class Tokenizer {
 public:
     Token curToken;
 
-    Tokenizer(std::string_view filename_, std::string_view source_)
-        : filename{filename_}, source{source_} {}
+    Tokenizer(File file_) : file{file_} {}
 
     TokenizerResult PollToken();
     TokenizerResult PollTokenWithComments();

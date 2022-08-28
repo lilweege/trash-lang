@@ -1,5 +1,6 @@
 #pragma once
 
+#include "compileerror.hpp"
 #include "tokenizer.hpp"
 
 #include <vector>
@@ -100,7 +101,7 @@ const ASTIndex AST_NULL = 0; // Null points to the root
 const ASTList AST_EMPTY = 0;
 
 
-struct AST {
+struct ASTNode {
 //     using StringView = std::string_view; // std::string_view is not trivial :(
     struct StringView {
         const char* buf;
@@ -202,15 +203,21 @@ struct AST {
     ASTKind kind;
 };
 
+struct AST {
+    std::vector<ASTNode> tree;
+    std::vector<std::vector<ASTIndex>> lists;
+};
 
 class Parser {
-    std::string_view filename;
-    std::string_view source;
-    std::vector<Token> tokens;
+public:
+    const File file;
+    const std::vector<Token> tokens;
+private:
     TokenIndex tokenIdx;
-    std::vector<AST> tree;
-    std::vector<std::vector<ASTIndex>> indices;
+public:
+    AST ast;
 
+private:
     ASTIndex NewNode(ASTKind kind);
     ASTIndex NewNodeFromToken(TokenIndex tokenIdx, ASTKind kind);
     ASTIndex NewNodeFromLastToken(ASTKind kind);
@@ -245,13 +252,13 @@ class Parser {
     void ParseEntireProgram();
 
 public:
-    Parser(std::string_view filename_, std::string_view source_, std::vector<Token> tokens_)
-        : filename{filename_}, source{source_}, tokens{std::move(tokens_)}
+    Parser(File file_, std::vector<Token> tokens_)
+        : file{file_}, tokens{std::move(tokens_)}
     {
         ParseEntireProgram();
     }
 };
 
 
-static_assert(std::is_trivial_v<AST>);
-static_assert(sizeof(AST) == 24);
+static_assert(std::is_trivial_v<ASTNode>);
+static_assert(sizeof(ASTNode) == 24);

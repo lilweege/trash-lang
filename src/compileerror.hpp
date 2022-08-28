@@ -1,16 +1,23 @@
 #pragma once
 
-#include "tokenizer.hpp"
-
+#include <string_view>
 #include <fmt/core.h>
 #include <fmt/color.h>
 
 static bool IsNewline(char ch) {
     return ch == '\r' || ch == '\n';
 }
-static bool IsWhitespace(char ch) {
-    return ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t';
-}
+
+struct File {
+    std::string_view filename;
+    std::string_view source;
+};
+
+#define CompileErrorAtToken(file, token, format, ...) do { \
+        fmt::print(stderr, "{}\n", CompileErrorMessage((file).filename, (token).pos.line, (token).pos.col, \
+            (file).source, (token).pos.idx, format, __VA_OPT__(,) __VA_ARGS__)); \
+        exit(1); \
+    } while (0)
 
 #define CompileErrorMessage(filename, line, col, source, sourceIdx, format, ...) \
     CompileErrorMessage_("{}:{}:{}: {}" format "\n{}\n{:>{}}", \

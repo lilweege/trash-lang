@@ -1,3 +1,4 @@
+#include "compileerror.hpp"
 #include "compiler.hpp"
 #include "tokenizer.hpp"
 #include "parser.hpp"
@@ -102,8 +103,10 @@ void CompilerMain(int argc, char** argv) {
 
     CompilerOptions options{ ParseArguments(argc, argv) };
     std::string source{ ReadEntireFile(options.srcFn) };
-    Tokenizer tokenizer{ options.srcFn, source };
-    Parser parser{ options.srcFn, source, TokenizeEntireSource(tokenizer) };
+    File file{ options.srcFn, source };
+    Tokenizer tokenizer{ file };
+    Parser parser{ file, TokenizeEntireSource(tokenizer) };
+    // { options.srcFn, source, std::move(parser.ast) };
     // TODO: typecheck and analyze
     // TODO: generate code
     fmt::print(stderr, "DONE!\n");

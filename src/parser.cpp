@@ -63,12 +63,7 @@ const char* TypeKindName(TypeKind kind) {
     return TypeKindNames[static_cast<uint32_t>(kind)];
 }
 
-#define CompileErrorAt(token, format, ...) do { \
-        fmt::print(stderr, "{}\n", CompileErrorMessage(filename, (token).pos.line, (token).pos.col, \
-            source, (token).pos.idx, format, __VA_OPT__(,) __VA_ARGS__)); \
-        exit(1); \
-    } while (0)
-
+#define CompileErrorAt(token, format, ...) CompileErrorAtToken(file, token, format, __VA_ARGS__)
 #define ExpectAndConsumeToken(expectedKind, format, ...) do { \
         const Token& token = PollCurrentToken(); \
         if (token.kind != expectedKind) \
@@ -77,14 +72,14 @@ const char* TypeKindName(TypeKind kind) {
 
 
 ASTIndex Parser::NewNode(ASTKind kind) {
-    tree.emplace_back();
-    tree.back().kind = kind;
-    return static_cast<ASTIndex>(tree.size()-1);
+    ast.tree.emplace_back();
+    ast.tree.back().kind = kind;
+    return static_cast<ASTIndex>(ast.tree.size()-1);
 }
 
 ASTIndex Parser::NewNodeFromToken(TokenIndex tokenIdx, ASTKind kind) {
     ASTIndex idx = NewNode(kind);
-    AST& node = tree[idx];
+    ASTNode& node = ast.tree[idx];
     node.tokenIdx = tokenIdx;
     return idx;
 }
@@ -104,12 +99,12 @@ const Token& Parser::PollCurrentToken() {
 }
 
 ASTList Parser::NewASTList() {
-    indices.emplace_back();
-    return static_cast<ASTList>(indices.size() - 1);
+    ast.lists.emplace_back();
+    return static_cast<ASTList>(ast.lists.size() - 1);
 }
 
 void Parser::AddToASTList(ASTList list, ASTIndex idx) {
-    indices[list].push_back(idx);
+    ast.lists[list].push_back(idx);
 }
 
 static void PrintIndent(uint32_t depth) {
@@ -118,7 +113,7 @@ static void PrintIndent(uint32_t depth) {
 }
 
 void Parser::PrintNode(ASTIndex rootIdx) const {
-    const AST& root = tree[rootIdx];
+    const ASTNode& root = ast.tree[rootIdx];
     fmt::print(stderr, "{}: ", ASTKindName(root.kind));
     assert(root.tokenIdx != TOKEN_NULL);
     const Token& token = tokens[root.tokenIdx];
@@ -127,11 +122,11 @@ void Parser::PrintNode(ASTIndex rootIdx) const {
 
 void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
     auto PrintASTList = [&](ASTList body, uint32_t newDepth) {
-        for (ASTIndex childIdx : indices[body])
+        for (ASTIndex childIdx : ast.lists[body])
             PrintAST(childIdx, newDepth);
     };
 
-    const AST& root = tree[rootIdx];
+    const ASTNode& root = ast.tree[rootIdx];
 
     switch (root.kind) {
         case ASTKind::PROGRAM: {
@@ -328,9 +323,9 @@ ASTIndex Parser::ParseVarDefn() {
         "Invalid variable declaration, expected identifier after type");
 
     ASTIndex defn = NewNodeFromLastToken(ASTKind::DEFINITION);
-    tree[defn].defn.isConst = letOrMut.kind == TokenKind::LET;
-    tree[defn].defn.type = type;
-    tree[defn].defn.arraySize = arrSize;
+    ast.tree[defn].defn.isConst = letOrMut.kind == TokenKind::LET;
+    ast.tree[defn].defn.type = type;
+    ast.tree[defn].defn.arraySize = arrSize;
 
     return defn;
 }
@@ -347,7 +342,7 @@ ASTIndex Parser::ParseVarDefnAsgn() {
         ASTIndex expr = ParseExpression();
         if (expr == AST_NULL)
             CompileErrorAt(maybeAsgn, "Expected expression after \"=\"");
-        tree[defn].defn.initExpr = expr;
+        ast.tree[defn].defn.initExpr = expr;
     }
 
     return defn;
@@ -368,17 +363,17 @@ ASTIndex Parser::ParseIf() {
     ASTIndex cond = ParseExpression();
     if (cond == AST_NULL)
         CompileErrorAt(PeekCurrentToken(), "Invalid expression after \"(\"");
-    tree[ifStmt].ifstmt.cond = cond;
+    ast.tree[ifStmt].ifstmt.cond = cond;
 
     if (PollCurrentToken().kind != TokenKind::RPAREN)
         CompileErrorAt(lparen, "Unmatched parenthesis after \"if\" statement");
-    tree[ifStmt].ifstmt.body = ParseBody();
+    ast.tree[ifStmt].ifstmt.body = ParseBody();
 
     // Parse optional else
     const Token& maybeElse = PeekCurrentToken();
     if (maybeElse.kind == TokenKind::ELSE) {
         ++tokenIdx;
-        tree[ifStmt].ifstmt.elsestmt = ParseBody();
+        ast.tree[ifStmt].ifstmt.elsestmt = ParseBody();
     }
 
     return ifStmt;
@@ -408,7 +403,7 @@ ASTIndex Parser::ParseCall() {
         return call;
     }
 
-    tree[call].call.args = NewASTList();
+    ast.tree[call].call.args = NewASTList();
 
     // At least one argument, continue
     while (true) {
@@ -417,7 +412,7 @@ ASTIndex Parser::ParseCall() {
             CompileErrorAt(PeekCurrentToken(),
                 "Invalid argument, excpected comma separated expression list");
 
-        AddToASTList(tree[call].call.args, arg);
+        AddToASTList(ast.tree[call].call.args, arg);
 
         const Token& commaOrClose = PollCurrentToken();
         if (commaOrClose.kind == TokenKind::RPAREN) {
@@ -441,7 +436,7 @@ ASTIndex Parser::ParseLValue() {
     ++tokenIdx;
 
     ASTIndex lvalue = NewNodeFromLastToken(ASTKind::LVALUE_EXPR);
-    tree[lvalue].lvalue.subscript = ParseSubscript();
+    ast.tree[lvalue].lvalue.subscript = ParseSubscript();
 
     return lvalue;
 }
@@ -467,8 +462,8 @@ ASTIndex Parser::ParseAssignment() {
         CompileErrorAt(eq, "Expected expression after \"=\"");
 
     ASTIndex assign = NewNodeFromLastToken(ASTKind::ASSIGN);
-    tree[assign].asgn.lvalue = lvalue;
-    tree[assign].asgn.rvalue = rvalue;
+    ast.tree[assign].asgn.lvalue = lvalue;
+    ast.tree[assign].asgn.rvalue = rvalue;
 
     return assign;
 }
@@ -492,7 +487,7 @@ ASTIndex Parser::ParseFor() {
             CompileErrorAt(semi, "Invalid declaration");
     }
     ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after for statement initializer");
-    tree[forStmt].forstmt.init = init;
+    ast.tree[forStmt].forstmt.init = init;
 
     ASTIndex cond = ParseExpression();
     if (cond == AST_NULL) {
@@ -501,7 +496,7 @@ ASTIndex Parser::ParseFor() {
             CompileErrorAt(semi, "Invalid condition");
     }
     ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after for statement condition");
-    tree[forStmt].forstmt.cond = cond;
+    ast.tree[forStmt].forstmt.cond = cond;
 
     ASTIndex incr = ParseAssignment();
     if (incr == AST_NULL) {
@@ -511,9 +506,9 @@ ASTIndex Parser::ParseFor() {
     }
     if (PollCurrentToken().kind != TokenKind::RPAREN)
         CompileErrorAt(lparen, "Unmatched parenthesis after \"for\" statement");
-    tree[forStmt].forstmt.incr = incr;
+    ast.tree[forStmt].forstmt.incr = incr;
 
-    tree[forStmt].forstmt.body = ParseBody();
+    ast.tree[forStmt].forstmt.body = ParseBody();
 
     return forStmt;
 }
@@ -523,14 +518,14 @@ ASTIndex Parser::ParseFactor() {
     if (tok.kind == TokenKind::INTEGER_LITERAL) {
         ++tokenIdx;
         ASTIndex lit = NewNodeFromLastToken(ASTKind::INTEGER_LITERAL_EXPR);
-        if (!ParseLiteral(tok.text, tree[lit].literal.i64))
+        if (!ParseLiteral(tok.text, ast.tree[lit].literal.i64))
             CompileErrorAt(tok, "Invalid integer literal");
         return lit;
     }
     else if (tok.kind == TokenKind::FLOAT_LITERAL) {
         ++tokenIdx;
         ASTIndex lit = NewNodeFromLastToken(ASTKind::FLOAT_LITERAL_EXPR);
-        if (!ParseLiteral(tok.text, tree[lit].literal.f64))
+        if (!ParseLiteral(tok.text, ast.tree[lit].literal.f64))
             CompileErrorAt(tok, "Invalid float literal");
         return lit;
     }
@@ -538,13 +533,13 @@ ASTIndex Parser::ParseFactor() {
         ++tokenIdx;
         ASTIndex lit = NewNodeFromLastToken(ASTKind::STRING_LITERAL_EXPR);
         // TODO: new string with escaped characters
-        tree[lit].literal.str = { .buf = tok.text.data(), .sz = tok.text.size() };
+        ast.tree[lit].literal.str = { .buf = tok.text.data(), .sz = tok.text.size() };
         return lit;
     }
     else if (tok.kind == TokenKind::CHAR_LITERAL) {
         ++tokenIdx;
         ASTIndex lit = NewNodeFromLastToken(ASTKind::CHAR_LITERAL_EXPR);
-        tree[lit].literal.u8 = tok.text.size() == 1 ? tok.text[0] : (
+        ast.tree[lit].literal.u8 = tok.text.size() == 1 ? tok.text[0] : (
             tok.text[1] == 'n' ? '\n' :
             tok.text[1] == 't' ? '\t' :
             tok.text[1] == '"' ? '\"' :
@@ -558,7 +553,7 @@ ASTIndex Parser::ParseFactor() {
         ASTIndex expr = ParseFactor();
         if (expr == AST_NULL)
             CompileErrorAt(tok, "Expected factor after \"-\"");
-        tree[neg].unaryOp.expr = expr;
+        ast.tree[neg].unaryOp.expr = expr;
         return neg;
     }
     else if (tok.kind == TokenKind::OPERATOR_NOT) {
@@ -567,7 +562,7 @@ ASTIndex Parser::ParseFactor() {
         ASTIndex expr = ParseFactor();
         if (expr == AST_NULL)
             CompileErrorAt(tok, "Expected factor after \"!\"");
-        tree[neg].unaryOp.expr = expr;
+        ast.tree[neg].unaryOp.expr = expr;
         return neg;
     }
     else if (tok.kind == TokenKind::LPAREN) {
@@ -607,11 +602,11 @@ ASTIndex Parser::ParseTerm() {
         ASTIndex binop = NewNodeFromLastToken(
             delim.kind == TokenKind::OPERATOR_MUL ? ASTKind::MUL_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_DIV ? ASTKind::DIV_BINARYOP_EXPR : ASTKind::MOD_BINARYOP_EXPR);
-        tree[binop].binaryOp.left = left;
+        ast.tree[binop].binaryOp.left = left;
         ASTIndex right = ParseFactor();
         if (right == AST_NULL)
             return AST_NULL;
-        tree[binop].binaryOp.right = right;
+        ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
     return left;
@@ -628,11 +623,11 @@ ASTIndex Parser::ParseValue() {
         ++tokenIdx;
         ASTIndex binop = NewNodeFromLastToken(delim.kind == TokenKind::OPERATOR_POS ?
             ASTKind::ADD_BINARYOP_EXPR : ASTKind::SUB_BINARYOP_EXPR);
-        tree[binop].binaryOp.left = left;
+        ast.tree[binop].binaryOp.left = left;
         ASTIndex right = ParseTerm();
         if (right == AST_NULL)
             return AST_NULL;
-        tree[binop].binaryOp.right = right;
+        ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
     return left;
@@ -654,11 +649,11 @@ ASTIndex Parser::ParseComparison() {
             delim.kind == TokenKind::OPERATOR_GE ? ASTKind::GE_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_LE ? ASTKind::LE_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_GT ? ASTKind::GT_BINARYOP_EXPR : ASTKind::LT_BINARYOP_EXPR);
-        tree[binop].binaryOp.left = left;
+        ast.tree[binop].binaryOp.left = left;
         ASTIndex right = ParseValue();
         if (right == AST_NULL)
             return AST_NULL;
-        tree[binop].binaryOp.right = right;
+        ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
     return left;
@@ -675,11 +670,11 @@ ASTIndex Parser::ParseLogicalFactor() {
         ++tokenIdx;
         ASTIndex binop = NewNodeFromLastToken(delim.kind == TokenKind::OPERATOR_EQ ?
             ASTKind::EQ_BINARYOP_EXPR : ASTKind::NE_BINARYOP_EXPR);
-        tree[binop].binaryOp.left = left;
+        ast.tree[binop].binaryOp.left = left;
         ASTIndex right = ParseComparison();
         if (right == AST_NULL)
             return AST_NULL;
-        tree[binop].binaryOp.right = right;
+        ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
     return left;
@@ -695,11 +690,11 @@ ASTIndex Parser::ParseLogicalTerm() {
             break;
         ++tokenIdx;
         ASTIndex binop = NewNodeFromLastToken(ASTKind::AND_BINARYOP_EXPR);
-        tree[binop].binaryOp.left = left;
+        ast.tree[binop].binaryOp.left = left;
         ASTIndex right = ParseLogicalFactor();
         if (right == AST_NULL)
             return AST_NULL;
-        tree[binop].binaryOp.right = right;
+        ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
     return left;
@@ -716,11 +711,11 @@ ASTIndex Parser::ParseExpression() {
             break;
         ++tokenIdx;
         ASTIndex binop = NewNodeFromLastToken(ASTKind::OR_BINARYOP_EXPR);
-        tree[binop].binaryOp.left = left;
+        ast.tree[binop].binaryOp.left = left;
         ASTIndex right = ParseLogicalTerm();
         if (right == AST_NULL)
             return AST_NULL;
-        tree[binop].binaryOp.right = right;
+        ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
     return left;
@@ -742,7 +737,7 @@ ASTIndex Parser::ParseStatement() {
     else if (tok.kind == TokenKind::RETURN) {
         ++tokenIdx;
         ASTIndex ret = NewNodeFromLastToken(ASTKind::RETURN_STATEMENT);
-        tree[ret].ret.expr = ParseExpression();
+        ast.tree[ret].ret.expr = ParseExpression();
         ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after return");
         return ret;
     }
@@ -820,14 +815,14 @@ ASTIndex Parser::ParseProcedure() {
     }
     else if (nextTok.kind == TokenKind::LET || nextTok.kind == TokenKind::MUT) {
         // At least one parameter, continue
-        tree[proc].proc.params = NewASTList();
+        ast.tree[proc].proc.params = NewASTList();
         while (true) {
             ASTIndex param = ParseVarDefn();
             if (param == AST_NULL)
                 CompileErrorAt(PeekCurrentToken(),
                     "Unexpected token, excpected comma separated parameter list");
 
-            AddToASTList(tree[proc].proc.params, param);
+            AddToASTList(ast.tree[proc].proc.params, param);
 
             const Token& commaOrClose = PollCurrentToken();
             if (commaOrClose.kind == TokenKind::RPAREN) {
@@ -852,11 +847,11 @@ ASTIndex Parser::ParseProcedure() {
             CompileErrorAt(*arrowOrCurly, "Returning arrays is not allowed!");
         }
 
-        tree[proc].proc.retType = retType;
+        ast.tree[proc].proc.retType = retType;
         arrowOrCurly = &PeekCurrentToken();
     }
 
-    tree[proc].proc.body = ParseBody();
+    ast.tree[proc].proc.body = ParseBody();
 
     return proc;
 }
@@ -868,17 +863,17 @@ void Parser::ParseProgram() {
         assert(proc != AST_NULL);
         AddToASTList(allProcs, proc);
     }
-    tree[0].program.procedures = allProcs;
+    ast.tree[0].program.procedures = allProcs;
 }
 
 void Parser::ParseEntireProgram() {
     tokenIdx = 1;
     // Reserve "null indices", the 0th element is unused
-    indices.emplace_back();
+    ast.lists.emplace_back();
     NewNode(ASTKind::PROGRAM);
     assert(tokens[0].kind == TokenKind::NONE);
-    assert(indices.size() == 1);
-    assert(tree.size() == 1);
+    assert(ast.lists.size() == 1);
+    assert(ast.tree.size() == 1);
 
     ParseProgram();
     PrintAST();
