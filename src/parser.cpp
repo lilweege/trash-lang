@@ -65,9 +65,9 @@ const char* TypeKindName(TypeKind kind) {
 
 #define CompileErrorAt(token, format, ...) CompileErrorAtToken(file, token, format, __VA_ARGS__)
 #define ExpectAndConsumeToken(expectedKind, format, ...) do { \
-        const Token& token = PollCurrentToken(); \
-        if (token.kind != expectedKind) \
-            CompileErrorAt(token, format __VA_OPT__(,) __VA_ARGS__); \
+        const Token& tok_ = PollCurrentToken(); \
+        if (tok_.kind != expectedKind) \
+            CompileErrorAt(tok_, format __VA_OPT__(,) __VA_ARGS__); \
     } while (0)
 
 
@@ -77,10 +77,10 @@ ASTIndex Parser::NewNode(ASTKind kind) {
     return static_cast<ASTIndex>(ast.tree.size()-1);
 }
 
-ASTIndex Parser::NewNodeFromToken(TokenIndex tokenIdx, ASTKind kind) {
+ASTIndex Parser::NewNodeFromToken(TokenIndex tokIdx, ASTKind kind) {
     ASTIndex idx = NewNode(kind);
     ASTNode& node = ast.tree[idx];
-    node.tokenIdx = tokenIdx;
+    node.tokenIdx = tokIdx;
     return idx;
 }
 
@@ -117,9 +117,10 @@ void Parser::PrintNode(ASTIndex rootIdx) const {
     fmt::print(stderr, "{}: ", ASTKindName(root.kind));
     assert(root.tokenIdx != TOKEN_NULL);
     const Token& token = tokens[root.tokenIdx];
-    PrintToken(token);
+    fmt::print(stderr, "{}", token);
 }
 
+// TODO: make freestanding or make templated fmt::formatter
 void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
     auto PrintASTList = [&](ASTList body, uint32_t newDepth) {
         for (ASTIndex childIdx : ast.lists[body])
@@ -158,11 +159,11 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             PrintIndent(depth);
             PrintNode(rootIdx);
             fmt::print(stderr, "\n");
-            if (root.forstmt.init) PrintAST(root.forstmt.init, depth + 1);
+            if (root.forstmt.init != AST_NULL) PrintAST(root.forstmt.init, depth + 1);
             else { PrintIndent(depth + 1); fmt::print(stderr, "-\n"); }
-            if (root.forstmt.cond) PrintAST(root.forstmt.cond, depth + 1);
+            if (root.forstmt.cond != AST_NULL) PrintAST(root.forstmt.cond, depth + 1);
             else { PrintIndent(depth + 1); fmt::print(stderr, "-\n"); }
-            if (root.forstmt.incr) PrintAST(root.forstmt.incr, depth + 1);
+            if (root.forstmt.incr != AST_NULL) PrintAST(root.forstmt.incr, depth + 1);
             else { PrintIndent(depth + 1); fmt::print(stderr, "-\n"); }
             PrintIndent(depth); fmt::print(stderr, "\n");
             PrintASTList(root.forstmt.body, depth + 1);
@@ -539,7 +540,7 @@ ASTIndex Parser::ParseFactor() {
     else if (tok.kind == TokenKind::CHAR_LITERAL) {
         ++tokenIdx;
         ASTIndex lit = NewNodeFromLastToken(ASTKind::CHAR_LITERAL_EXPR);
-        ast.tree[lit].literal.u8 = tok.text.size() == 1 ? tok.text[0] : (
+        ast.tree[lit].literal.u8 = tok.text.size() == 1 ? static_cast<uint8_t>(tok.text[0]) : (
             tok.text[1] == 'n' ? '\n' :
             tok.text[1] == 't' ? '\t' :
             tok.text[1] == '"' ? '\"' :
@@ -701,6 +702,7 @@ ASTIndex Parser::ParseLogicalTerm() {
 }
 
 // let i64 x = 4 % 1 + !"asd" / 2.0 && a > -(8 + 2) * 3;
+// TODO: Pratt parsing for binary operators, remove repetitive functions
 ASTIndex Parser::ParseExpression() {
     ASTIndex left = ParseLogicalTerm();
     if (left == AST_NULL)
@@ -876,5 +878,12 @@ void Parser::ParseEntireProgram() {
     assert(ast.tree.size() == 1);
 
     ParseProgram();
-    PrintAST();
+}
+
+AST ParseEntireProgram(File file, const std::vector<Token>& tokens) {
+    AST ast;
+    Parser parser{file, tokens, ast};
+    parser.ParseEntireProgram();
+    parser.PrintAST();
+    return ast;
 }

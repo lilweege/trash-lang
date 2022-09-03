@@ -2,6 +2,12 @@
 
 ? this is a comment
 
+proc fib(let i64 x) -> i64 {
+    if (x < 2)
+        return x;
+    return fib(x-1) + fib(x-2);
+}
+
 proc primes(let i64 N) {
     mut u8[N] sieve;
     for (mut i64 i = 0; i < N; i = i + 1)
@@ -78,5 +84,3 @@ proc entry() {
 }
 
 ? EOF
-
-

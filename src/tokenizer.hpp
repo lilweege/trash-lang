@@ -56,44 +56,54 @@ enum class TokenKind : uint8_t {
 };
 const char* TokenKindName(TokenKind kind);
 
-enum class TokenizerError : uint8_t {
-    NONE,
-    EMPTY,
-    FAIL,
-};
-
-struct TokenizerResult {
-    TokenizerError err;
-    std::string msg;
-};
-
 struct FileLocation {
     size_t line, col, idx;
 };
 
+// TODO: use bitfield to eliminate wasted 7 bytes after kind
 struct Token {
     std::string_view text;
     FileLocation pos;
     TokenKind kind;
+
+    friend struct fmt::formatter<Token>;
 };
 
+template<>
+struct fmt::formatter<Token> {
+    template<typename ParseContext>
+    constexpr auto parse(ParseContext& ctx) {
+        return ctx.begin();
+    }
+
+    template<typename FormatContext>
+    auto format(const Token& token, FormatContext& ctx) {
+        return fmt::format_to(ctx.out(), "{}:{}:{}:\"{}\"",
+            TokenKindName(token.kind),
+            token.pos.line,
+            token.pos.col,
+            token.text);
+    }
+};
+
+
 class Tokenizer {
-public:
     const File file;
-private:
-    size_t sourceIdx{};
     FileLocation curPos{};
-    std::vector<Token> tokens;
-
 public:
-    Token curToken;
+    Token curToken{};
 
-    Tokenizer(File file_) : file{file_} {}
+    explicit Tokenizer(File file_)
+        : file{file_}
+    {}
 
-    TokenizerResult PollToken();
-    TokenizerResult PollTokenWithComments();
+    // Emits error and exits on error
+    // Returns false when tokenizing EOF
+    // Returns true otherwise (successfully got token)
+    bool PollTokenWithComments();
+    bool PollToken(); // Calls PollTokenWithComments
     void ConsumeToken();
 };
 
-bool TokenizeOK(const TokenizerResult& result);
-void PrintToken(const Token& token, FILE* stream = stderr);
+std::vector<Token> TokenizeEntireSource(File file);
+

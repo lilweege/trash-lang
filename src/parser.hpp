@@ -132,7 +132,7 @@ struct ASTNode {
             uint64_t i64;
             double f64;
             uint8_t u8;
-            StringView str;
+            StringView str; // largest member
         };
     };
 
@@ -163,6 +163,7 @@ struct ASTNode {
         // Access ident through token
         ASTIndex arraySize; // Should be integer literal
         ASTIndex initExpr; // Optional
+        // These variables should move to flags but the other structs in the union are bigger anyways
         bool isConst; // let/mut
         TypeKind type;
     };
@@ -193,6 +194,9 @@ struct ASTNode {
         ASTReturn ret;
     };
 
+    // String literal is making the struct big, so these aren't useful
+    // If this struct becomes smaller, this would be helpful.
+    // Currently this space is just wasted padding anyways...
 //     uint8_t flags1;
 //     uint8_t flags2;
 //     uint8_t flags3;
@@ -209,25 +213,18 @@ struct AST {
 };
 
 class Parser {
-public:
     const File file;
-    const std::vector<Token> tokens;
-private:
-    TokenIndex tokenIdx;
-public:
-    AST ast;
+    const std::vector<Token>& tokens;
+    TokenIndex tokenIdx{};
+    AST& ast;
 
-private:
     ASTIndex NewNode(ASTKind kind);
-    ASTIndex NewNodeFromToken(TokenIndex tokenIdx, ASTKind kind);
+    ASTIndex NewNodeFromToken(TokenIndex tokIdx, ASTKind kind);
     ASTIndex NewNodeFromLastToken(ASTKind kind);
-    const Token& PeekCurrentToken() const;
+    [[nodiscard]] const Token& PeekCurrentToken() const;
     const Token& PollCurrentToken();
     ASTList NewASTList();
     void AddToASTList(ASTList list, ASTIndex idx);
-
-    void PrintNode(ASTIndex rootIdx) const;
-    void PrintAST(ASTIndex rootIdx, uint32_t depth) const;
     ASTIndex ParseSubscript();
     std::pair<TypeKind, ASTIndex> ParseType();
     ASTIndex ParseVarDefn();
@@ -249,16 +246,19 @@ private:
     ASTIndex ParseProcedure();
     void ParseProgram();
 
-    void ParseEntireProgram();
 
 public:
-    Parser(File file_, std::vector<Token> tokens_)
-        : file{file_}, tokens{std::move(tokens_)}
-    {
-        ParseEntireProgram();
-    }
+    Parser(File file_, const std::vector<Token>& tokens_, AST& ast_)
+        : file{file_}, tokens{tokens_}, ast{ast_}
+    {}
+
+    void ParseEntireProgram();
+    void PrintNode(ASTIndex rootIdx) const;
+    void PrintAST(ASTIndex rootIdx, uint32_t depth) const;
 };
 
+AST ParseEntireProgram(File file, const std::vector<Token>& tokens);
 
 static_assert(std::is_trivial_v<ASTNode>);
-static_assert(sizeof(ASTNode) == 24);
+static_assert(sizeof(ASTNode) == 24); // Ensure this struct doesn't accidentally get bigger
+

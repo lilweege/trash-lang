@@ -13,9 +13,11 @@ struct File {
     std::string_view source;
 };
 
-#define CompileErrorAtToken(file, token, format, ...) do { \
-        fmt::print(stderr, "{}\n", CompileErrorMessage((file).filename, (token).pos.line, (token).pos.col, \
-            (file).source, (token).pos.idx, format, __VA_OPT__(,) __VA_ARGS__)); \
+#define CompileErrorAtToken(file, token, format, ...) CompileErrorAtLocation(file, (token).pos, format, __VA_ARGS__)
+
+#define CompileErrorAtLocation(file, pos, format, ...) do { \
+        fmt::print(stderr, "{}\n", CompileErrorMessage((file).filename, (pos).line, (pos).col, \
+            (file).source, (pos).idx, format __VA_OPT__(,) __VA_ARGS__)); \
         exit(1); \
     } while (0)
 
@@ -30,9 +32,9 @@ struct File {
         fmt::styled("^", fg(fmt::terminal_color::bright_green)), col \
     )
 
-static std::string_view ExtractWholeLine(std::string_view source, size_t sourceIdx) {
-    auto lineStart = source.begin() + sourceIdx - 1;
-    auto lineEnd = source.begin() + sourceIdx;
+static inline std::string_view ExtractWholeLine(std::string_view source, size_t sourceIdx) {
+    const auto *lineStart = source.begin() + sourceIdx - 1;
+    const auto *lineEnd = source.begin() + sourceIdx;
     while (lineStart != source.begin() && !IsNewline(*lineStart)) {
         --lineStart;
     }

@@ -1,5 +1,6 @@
 #include "compileerror.hpp"
 #include "compiler.hpp"
+#include "analyzer.hpp"
 #include "tokenizer.hpp"
 #include "parser.hpp"
 
@@ -66,48 +67,30 @@ static std::string ReadEntireFile(const std::string& filename) {
         fmt::print(stderr, "Error: Could not open file \"{}\".\n", filename);
         exit(1);
     }
+
+    auto sz = static_cast<size_t>(sourceStream.tellg());
+    if (sz == 0) return "";
     std::string contents;
-    contents.resize(sourceStream.tellg());
+    contents.resize(sz);
     sourceStream.seekg(0, std::ios::beg);
-    sourceStream.read(&contents[0], contents.size());
+    sourceStream.read(&contents[0], // NOLINT (.data() is const)
+        static_cast<long>(contents.size()));
     sourceStream.close();
     return contents;
-}
-
-static std::vector<Token> TokenizeEntireSource(Tokenizer& tokenizer) {
-    // It's debatable if it's better to tokenize the entire source and then parse all tokens,
-    // or interleave tokenizing with parsing.
-    // Notably, storing tokens contiguously and referring to them by pointer reduces the size of each AST node.
-    // Also, constant context switching probably isn't good for the CPU.
-    std::vector<Token> tokens{};
-    tokens.emplace_back(); // Reserved empty token
-
-    while (true) {
-        tokenizer.ConsumeToken();
-        TokenizerResult result = tokenizer.PollToken();
-        if (result.err == TokenizerError::FAIL) {
-            fmt::print(stderr, "{}\n", result.msg);
-            exit(1);
-        }
-        else if (result.err == TokenizerError::EMPTY) {
-            break;
-        }
-        tokens.push_back(tokenizer.curToken);
-    }
-
-    return tokens;
 }
 
 void CompilerMain(int argc, char** argv) {
     assert(argc > 0);
 
-    CompilerOptions options{ ParseArguments(argc, argv) };
-    std::string source{ ReadEntireFile(options.srcFn) };
-    File file{ options.srcFn, source };
-    Tokenizer tokenizer{ file };
-    Parser parser{ file, TokenizeEntireSource(tokenizer) };
-    // { options.srcFn, source, std::move(parser.ast) };
-    // TODO: typecheck and analyze
+    CompilerOptions options{ParseArguments(argc, argv)};
+    std::string source = ReadEntireFile(options.srcFn);
+    File file{options.srcFn, source};
+
+    std::vector<Token> tokens = TokenizeEntireSource(file);
+    AST ast = ParseEntireProgram(file, tokens);
+    VerifyAST(file, ast);
     // TODO: generate code
+    // TODO: emit binary
+
     fmt::print(stderr, "DONE!\n");
 }
