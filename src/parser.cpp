@@ -599,14 +599,16 @@ ASTIndex Parser::ParseTerm() {
         {
             break;
         }
-        ++tokenIdx;
+        TokenIndex op = tokenIdx++;
+        ASTIndex right = ParseFactor();
+        if (right == AST_NULL) {
+            tokenIdx = op;
+            return AST_NULL;
+        }
         ASTIndex binop = NewNodeFromLastToken(
             delim.kind == TokenKind::OPERATOR_MUL ? ASTKind::MUL_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_DIV ? ASTKind::DIV_BINARYOP_EXPR : ASTKind::MOD_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
-        ASTIndex right = ParseFactor();
-        if (right == AST_NULL)
-            return AST_NULL;
         ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
@@ -621,13 +623,15 @@ ASTIndex Parser::ParseValue() {
         const Token& delim = PeekCurrentToken();
         if (delim.kind != TokenKind::OPERATOR_POS && delim.kind != TokenKind::OPERATOR_NEG)
             break;
-        ++tokenIdx;
-        ASTIndex binop = NewNodeFromLastToken(delim.kind == TokenKind::OPERATOR_POS ?
+        TokenIndex op = tokenIdx++;
+        ASTIndex right = ParseTerm();
+        if (right == AST_NULL) {
+            tokenIdx = op;
+            return AST_NULL;
+        }
+        ASTIndex binop = NewNodeFromToken(op, delim.kind == TokenKind::OPERATOR_POS ?
             ASTKind::ADD_BINARYOP_EXPR : ASTKind::SUB_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
-        ASTIndex right = ParseTerm();
-        if (right == AST_NULL)
-            return AST_NULL;
         ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
@@ -645,15 +649,17 @@ ASTIndex Parser::ParseComparison() {
         {
             break;
         }
-        ++tokenIdx;
+        TokenIndex op = tokenIdx++;
+        ASTIndex right = ParseValue();
+        if (right == AST_NULL) {
+            tokenIdx = op;
+            return AST_NULL;
+        }
         ASTIndex binop = NewNodeFromLastToken(
             delim.kind == TokenKind::OPERATOR_GE ? ASTKind::GE_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_LE ? ASTKind::LE_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_GT ? ASTKind::GT_BINARYOP_EXPR : ASTKind::LT_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
-        ASTIndex right = ParseValue();
-        if (right == AST_NULL)
-            return AST_NULL;
         ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
@@ -668,13 +674,15 @@ ASTIndex Parser::ParseLogicalFactor() {
         const Token& delim = PeekCurrentToken();
         if (delim.kind != TokenKind::OPERATOR_EQ && delim.kind != TokenKind::OPERATOR_NE)
             break;
-        ++tokenIdx;
+        TokenIndex op = tokenIdx++;
+        ASTIndex right = ParseComparison();
+        if (right == AST_NULL) {
+            tokenIdx = op;
+            return AST_NULL;
+        }
         ASTIndex binop = NewNodeFromLastToken(delim.kind == TokenKind::OPERATOR_EQ ?
             ASTKind::EQ_BINARYOP_EXPR : ASTKind::NE_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
-        ASTIndex right = ParseComparison();
-        if (right == AST_NULL)
-            return AST_NULL;
         ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
@@ -689,12 +697,14 @@ ASTIndex Parser::ParseLogicalTerm() {
         const Token& delim = PeekCurrentToken();
         if (delim.kind != TokenKind::OPERATOR_AND)
             break;
-        ++tokenIdx;
+        TokenIndex op = tokenIdx++;
+        ASTIndex right = ParseLogicalFactor();
+        if (right == AST_NULL) {
+            tokenIdx = op;
+            return AST_NULL;
+        }
         ASTIndex binop = NewNodeFromLastToken(ASTKind::AND_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
-        ASTIndex right = ParseLogicalFactor();
-        if (right == AST_NULL)
-            return AST_NULL;
         ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
@@ -711,12 +721,14 @@ ASTIndex Parser::ParseExpression() {
         const Token& delim = PeekCurrentToken();
         if (delim.kind != TokenKind::OPERATOR_OR)
             break;
-        ++tokenIdx;
+        TokenIndex op = tokenIdx++;
+        ASTIndex right = ParseLogicalTerm();
+        if (right == AST_NULL) {
+            tokenIdx = op;
+            return AST_NULL;
+        }
         ASTIndex binop = NewNodeFromLastToken(ASTKind::OR_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
-        ASTIndex right = ParseLogicalTerm();
-        if (right == AST_NULL)
-            return AST_NULL;
         ast.tree[binop].binaryOp.right = right;
         left = binop;
     }
