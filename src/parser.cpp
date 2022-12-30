@@ -605,7 +605,7 @@ ASTIndex Parser::ParseTerm() {
             tokenIdx = op;
             return AST_NULL;
         }
-        ASTIndex binop = NewNodeFromLastToken(
+        ASTIndex binop = NewNodeFromToken(op,
             delim.kind == TokenKind::OPERATOR_MUL ? ASTKind::MUL_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_DIV ? ASTKind::DIV_BINARYOP_EXPR : ASTKind::MOD_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
