@@ -2,4 +2,4 @@
 
 #include "parser.hpp"
 
-void VerifyAST(File file, AST& ast);
+void VerifyAST(File file, const std::vector<Token>& tokens, AST& ast);

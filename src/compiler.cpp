@@ -88,7 +88,7 @@ void CompilerMain(int argc, char** argv) {
 
     std::vector<Token> tokens = TokenizeEntireSource(file);
     AST ast = ParseEntireProgram(file, tokens);
-    VerifyAST(file, ast);
+    VerifyAST(file, tokens, ast);
     // TODO: generate code
     // TODO: emit binary
 

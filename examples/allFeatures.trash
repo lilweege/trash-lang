@@ -2,6 +2,11 @@
 
 ? this is a comment
 
+proc testing(let i64[1+2] x) -> i64 {
+    ? ...
+    let i64 x = 4 % 1 + !"asd" / 2.0 && a > -(8 + 2) * 3;
+}
+
 proc fib(let i64 x) -> i64 {
     if (x < 2)
         return x;

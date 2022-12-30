@@ -181,7 +181,7 @@ struct ASTNode {
 
     union {
         ASTProgram program;
-        ASTProcedure proc;
+        ASTProcedure procedure;
         ASTBinaryOperator binaryOp;
         ASTUnaryOperator unaryOp;
         ASTLiteral literal;

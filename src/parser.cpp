@@ -138,10 +138,10 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             PrintIndent(depth);
             PrintNode(rootIdx);
             fmt::print(stderr, "\n");
-            PrintASTList(root.proc.params, depth + 1);
+            PrintASTList(root.procedure.params, depth + 1);
             PrintIndent(depth + 1);
-            fmt::print(stderr, "-> {}\n\n", TypeKindName(root.proc.retType));
-            PrintASTList(root.proc.body, depth + 1);
+            fmt::print(stderr, "-> {}\n\n", TypeKindName(root.procedure.retType));
+            PrintASTList(root.procedure.body, depth + 1);
         } break;
         case ASTKind::IF_STATEMENT: {
             PrintIndent(depth);
@@ -724,6 +724,9 @@ ASTIndex Parser::ParseExpression() {
         TokenIndex op = tokenIdx++;
         ASTIndex right = ParseLogicalTerm();
         if (right == AST_NULL) {
+            // TODO: Should an error be thrown here?
+            // In this case, token index does not have to be saved
+            // TODO: Compare existing error messages to clang and gcc and improve where necessary
             tokenIdx = op;
             return AST_NULL;
         }
@@ -745,6 +748,7 @@ ASTIndex Parser::ParseStatement() {
     }
     else if (tok.kind == TokenKind::LET || tok.kind == TokenKind::MUT) {
         ASTIndex defn = ParseVarDefnAsgn();
+        // FIXME: report error at the actual token
         ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after variable definition");
         return defn;
     }
@@ -752,18 +756,21 @@ ASTIndex Parser::ParseStatement() {
         ++tokenIdx;
         ASTIndex ret = NewNodeFromLastToken(ASTKind::RETURN_STATEMENT);
         ast.tree[ret].ret.expr = ParseExpression();
+        // FIXME: report error at the actual token
         ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after return");
         return ret;
     }
     else if (tok.kind == TokenKind::BREAK) {
         ++tokenIdx;
         ASTIndex brk = NewNodeFromLastToken(ASTKind::BREAK_STATEMENT);
+        // FIXME: report error at the actual token
         ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after break");
         return brk;
     }
     else if (tok.kind == TokenKind::CONTINUE) {
         ++tokenIdx;
         ASTIndex cont = NewNodeFromLastToken(ASTKind::CONTINUE_STATEMENT);
+        // FIXME: report error at the actual token
         ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after continue");
         return cont;
     }
@@ -772,6 +779,7 @@ ASTIndex Parser::ParseStatement() {
         // Assignment to lvalue
         ASTIndex assign = ParseAssignment();
         if (assign != AST_NULL) {
+            // FIXME: report error at the actual token
             ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after continue");
             return assign;
         }
@@ -829,14 +837,14 @@ ASTIndex Parser::ParseProcedure() {
     }
     else if (nextTok.kind == TokenKind::LET || nextTok.kind == TokenKind::MUT) {
         // At least one parameter, continue
-        ast.tree[proc].proc.params = NewASTList();
+        ASTList params = ast.tree[proc].procedure.params = NewASTList();
         while (true) {
             ASTIndex param = ParseVarDefn();
             if (param == AST_NULL)
                 CompileErrorAt(PeekCurrentToken(),
                     "Unexpected token, excpected comma separated parameter list");
 
-            AddToASTList(ast.tree[proc].proc.params, param);
+            AddToASTList(params, param);
 
             const Token& commaOrClose = PollCurrentToken();
             if (commaOrClose.kind == TokenKind::RPAREN) {
@@ -861,11 +869,11 @@ ASTIndex Parser::ParseProcedure() {
             CompileErrorAt(*arrowOrCurly, "Returning arrays is not allowed!");
         }
 
-        ast.tree[proc].proc.retType = retType;
+        ast.tree[proc].procedure.retType = retType;
         arrowOrCurly = &PeekCurrentToken();
     }
 
-    ast.tree[proc].proc.body = ParseBody();
+    ast.tree[proc].procedure.body = ParseBody();
 
     return proc;
 }
@@ -881,13 +889,14 @@ void Parser::ParseProgram() {
 }
 
 void Parser::ParseEntireProgram() {
-    tokenIdx = 1;
-    // Reserve "null indices", the 0th element is unused
-    ast.lists.emplace_back();
-    NewNode(ASTKind::PROGRAM);
-    assert(tokens[0].kind == TokenKind::NONE);
-    assert(ast.lists.size() == 1);
+    // Reserve "null indices". If a token index, ast index, or list index, then it's "null"
+    // Null indices are valid if the field is optional (for instance, for statement condition)
+    tokenIdx = 1;              // TokenIndex TOKEN_NULL
+    NewNode(ASTKind::PROGRAM); // ASTIndex AST_NULL
+    NewASTList();              // ASTList AST_EMPTY
+    assert(!tokens.empty() && tokens[0].kind == TokenKind::NONE);
     assert(ast.tree.size() == 1);
+    assert(ast.lists.size() == 1);
 
     ParseProgram();
 }
