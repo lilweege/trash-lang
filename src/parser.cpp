@@ -53,12 +53,13 @@ const char* ASTKindName(ASTKind kind) {
 }
 
 const char* TypeKindName(TypeKind kind) {
-    static_assert(static_cast<uint32_t>(TypeKind::COUNT) == 4, "Exhaustive check of type kinds failed");
+    static_assert(static_cast<uint32_t>(TypeKind::COUNT) == 5, "Exhaustive check of type kinds failed");
     const std::array<const char*, static_cast<uint32_t>(TypeKind::COUNT)> TypeKindNames{
-        "none",
+        "void",
         "u8",
         "i64",
         "f64",
+        "str",
     };
     return TypeKindNames[static_cast<uint32_t>(kind)];
 }

@@ -86,7 +86,7 @@ enum class TypeKind : uint8_t {
     U8,
     I64,
     F64,
-
+    STR,
     // ...
     COUNT
 };
