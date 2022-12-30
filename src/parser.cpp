@@ -173,7 +173,8 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             PrintIndent(depth);
             PrintNode(rootIdx);
             fmt::print(stderr, "\n");
-            PrintAST(root.ret.expr, depth + 1);
+            if (root.ret.expr != AST_NULL)
+                PrintAST(root.ret.expr, depth + 1);
         } break;
         case ASTKind::DEFINITION: {
             PrintIndent(depth);
@@ -451,6 +452,7 @@ ASTIndex Parser::ParseAssignment() {
         return AST_NULL;
     
     const Token& eq = PeekCurrentToken();
+    TokenIndex eqIdx = tokenIdx;
     if (eq.kind != TokenKind::OPERATOR_ASSIGN) {
         tokenIdx = oldTokenIdx;
         return AST_NULL;
@@ -463,7 +465,7 @@ ASTIndex Parser::ParseAssignment() {
     if (rvalue == AST_NULL)
         CompileErrorAt(eq, "Expected expression after \"=\"");
 
-    ASTIndex assign = NewNodeFromLastToken(ASTKind::ASSIGN);
+    ASTIndex assign = NewNodeFromToken(eqIdx, ASTKind::ASSIGN);
     ast.tree[assign].asgn.lvalue = lvalue;
     ast.tree[assign].asgn.rvalue = rvalue;
 
@@ -656,7 +658,7 @@ ASTIndex Parser::ParseComparison() {
             tokenIdx = op;
             return AST_NULL;
         }
-        ASTIndex binop = NewNodeFromLastToken(
+        ASTIndex binop = NewNodeFromToken(op,
             delim.kind == TokenKind::OPERATOR_GE ? ASTKind::GE_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_LE ? ASTKind::LE_BINARYOP_EXPR :
             delim.kind == TokenKind::OPERATOR_GT ? ASTKind::GT_BINARYOP_EXPR : ASTKind::LT_BINARYOP_EXPR);
@@ -681,7 +683,7 @@ ASTIndex Parser::ParseLogicalFactor() {
             tokenIdx = op;
             return AST_NULL;
         }
-        ASTIndex binop = NewNodeFromLastToken(delim.kind == TokenKind::OPERATOR_EQ ?
+        ASTIndex binop = NewNodeFromToken(op, delim.kind == TokenKind::OPERATOR_EQ ?
             ASTKind::EQ_BINARYOP_EXPR : ASTKind::NE_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
         ast.tree[binop].binaryOp.right = right;
@@ -704,7 +706,7 @@ ASTIndex Parser::ParseLogicalTerm() {
             tokenIdx = op;
             return AST_NULL;
         }
-        ASTIndex binop = NewNodeFromLastToken(ASTKind::AND_BINARYOP_EXPR);
+        ASTIndex binop = NewNodeFromToken(op, ASTKind::AND_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
         ast.tree[binop].binaryOp.right = right;
         left = binop;
@@ -731,7 +733,7 @@ ASTIndex Parser::ParseExpression() {
             tokenIdx = op;
             return AST_NULL;
         }
-        ASTIndex binop = NewNodeFromLastToken(ASTKind::OR_BINARYOP_EXPR);
+        ASTIndex binop = NewNodeFromToken(op, ASTKind::OR_BINARYOP_EXPR);
         ast.tree[binop].binaryOp.left = left;
         ast.tree[binop].binaryOp.right = right;
         left = binop;
