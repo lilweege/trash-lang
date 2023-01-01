@@ -74,6 +74,7 @@ Type Analyzer::VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string
         case ASTKind::CHAR_LITERAL_EXPR:    return { TypeKind::U8, true };
         case ASTKind::STRING_LITERAL_EXPR:  return { TypeKind::STR, true };
         case ASTKind::CALL_EXPR: return VerifyCall(exprIdx, symbolTable);
+        default: break;
     }
 
     const Token& token = tokens[expr.tokenIdx];
