@@ -313,20 +313,30 @@ void Analyzer::VerifyProgram() {
     procedureDefns["itoc"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = TypeKind::U8, };
     procedureDefns["ctoi"] = ProcedureDefn{ .paramTypes = { u8Param }, .returnType = TypeKind::I64, };
 
+    bool hasEntry = false;
     // Collect all procedure definitions and "forward declare" them.
     // Mutual recursion should work out of the box
     const auto& procedures = ast.lists[prog.program.procedures];
     for (ASTIndex procIdx : procedures) {
         const ASTNode& proc = ast.tree[procIdx];
         const Token& procName = tokens[proc.tokenIdx];
-        if (procedureDefns.contains(procName.text))
+        if (procedureDefns.contains(procName.text)) {
             CompileErrorAt(procName, "Redefinition of procedure '{}'", procName.text);
+        }
+        if (!hasEntry && procName.text == "entry") {
+            hasEntry = true;
+            // TODO: Check arguments and return type of main
+        }
 
         const auto& params = ast.lists[proc.procedure.params];
         procedureDefns[procName.text] = ProcedureDefn{
                 .paramTypes = params,
                 .returnType = proc.procedure.retType,
             };
+    }
+
+    if (!hasEntry) {
+        CompileErrorAt(tokens.back(), "Missing entrypoint procedure 'entry'");
     }
 
     for (ASTIndex procIdx : procedures) {
