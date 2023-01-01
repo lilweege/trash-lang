@@ -1,11 +1,4 @@
-
-
-? this is a comment
-
-proc testing(let i64[1+2] x) -> i64 {
-    ? ...
-    let i64 x = 4 % 1 + !"asd" / 2.0 && a > -(8 + 2) * 3;
-}
+? This is a comment
 
 proc fib(let i64 x) -> i64 {
     if (x < 2)
@@ -13,16 +6,19 @@ proc fib(let i64 x) -> i64 {
     return fib(x-1) + fib(x-2);
 }
 
-proc primes(let i64 N) {
+proc primes(let i64 N) -> i64 {
+    let u8 true = itoc(1);
+    let u8 false = itoc(0);
+
     mut u8[N] sieve;
     for (mut i64 i = 0; i < N; i = i + 1)
-        sieve[i] = 0;
+        sieve[i] = false;
 
-    let i64 root = sqrt(N);
+    let i64 root = ftoi(sqrt(itof(N)));
     for (mut i64 i = 0; i < root; i = i + 1) {
         if (!sieve[i]) continue;
         for (mut i64 j = 0; j <= N; j = j + 1) {
-            sieve[j] = 0;
+            sieve[j] = false;
         }
     }
 
@@ -33,31 +29,31 @@ proc primes(let i64 N) {
 }
 
 proc fizzbuzz() {
-    for (mut i64 i = 0; i < 100; i = i + 1) {
+    for (mut i64 i = 0;; i = i + 1) {
         let u8 div3 = i % 3 == 0;
         let u8 div5 = i % 5 == 0;
 
-        if (div3 && div5) puts("FizzBuzz");
-        else if (div3)    puts("Fizz");
-        else if (div5)    puts("Buzz");
-        else              puti(i);
-        putc('\n');
+        if (div3 && div5)  puts("FizzBuzz");
+        else if (div3)     puts("Fizz");
+        else if (div5)     puts("Buzz");
+        else if (i >= 100) return;
+        else               puti(i);
+        puts("\n");
     }
 }
 
 proc approxPi() -> f64 {
     let i64 N = 1000000;
-    mut f64 pi = 0.0;
+    mut f64 pi4 = 0.0;
     for (mut i64 i = 0; i < N; i = i + 1) {
-        mut f64 x = 1.0 / (2.0 * itf(i) + 1.0);
+        mut f64 x = 1.0 / (2.0 * itof(i) + 1.0);
         if (i % 2) x = -x;
-        pi = pi + x;
+        pi4 = pi4 + x;
     }
-    pi = pi * 4.0;
+    let f64 pi = pi4 * 4.0;
 
     return pi;
 }
-
 
 proc collatz(mut i64 x) -> i64 {
     mut i64 n = 0;
@@ -73,19 +69,19 @@ proc collatz(mut i64 x) -> i64 {
     return n;
 }
 
-proc add(let i64 x, let i64 y) -> i64
-    return x + y;
+proc add(let i64 x, let i64 y) -> i64 return x + y;
 
 proc mulmod(let i64 x, let i64 y, let i64 m) -> i64
     return (x * y) % m;
 
 proc foo() {}
 
-proc entry() {
+proc entry() -> i64 {
     puts("hello world\n");
-    puti(primes(1000001)); putc('\n');
-    puti(collatz(27)); putc('\n');
-    putf(approxPi()); putc('\n');
+    puti(primes(1000001)); puts("\n");
+    puti(collatz(27)); puts("\n");
+    putf(approxPi()); puts("\n");
+    return 0;
 }
 
-? EOF
+? This is the end of the file
