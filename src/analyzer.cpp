@@ -214,7 +214,7 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
                 Type{ TypeKind::NONE, true } :
                 VerifyExpression(stmt.ret.expr, symbolTable);
             if (!retType.isScalar || retType.kind != currProcRetType) {
-                CompileErrorAt(tokens[ast.tree[stmt.ret.expr].tokenIdx],
+                CompileErrorAt(tokens[ast.tree[stmtIdx].tokenIdx],
                     "Incompatible return type {}, expected {}",
                     TypeKindName(retType.kind), TypeKindName(currProcRetType));
             }
