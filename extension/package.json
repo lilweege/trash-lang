@@ -1,0 +1,30 @@
+{
+	"name": "trash",
+	"displayName": "Trash",
+	"description": "Extension for the trash-lang programming language",
+	"version": "1.0.0",
+	"publisher": "Luigi Quattrociocchi",
+	"engines": {
+		"vscode": "^1.28.0"
+	},
+	"categories": [
+		"Programming Languages"
+	],
+	"contributes": {
+		"languages": [
+			{
+				"id": "trash",
+				"extensions": [".trash"],
+				"aliases": ["trash"],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "trash",
+				"scopeName": "source.trash",
+				"path": "./syntaxes/trash.tmLanguage.json"
+			}
+		]
+	}
+}

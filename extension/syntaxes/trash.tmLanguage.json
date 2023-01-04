@@ -1,0 +1,93 @@
+{
+	"name": "trash",
+	"scopeName": "source.trash",
+	"patterns": [
+		{ "include": "#evaluate" }
+	],
+	"repository": {
+		"evaluate": {
+			"patterns": [
+				{ "include": "#comments" },
+				{ "include": "#keywords" },
+				{ "include": "#procedure" },
+				{ "include": "#literals" },
+				{ "include": "#strings" },
+				{ "include": "#types" },
+				{ "include": "#variable" }
+			]
+		},
+		"variable": {
+			"patterns": [
+				{
+					"match": "\\b([[a-zA-Z]_]\\w*)\\b",
+					"captures": {
+						"1": { "name": "variable.other" }
+					}
+				}
+			]
+		},
+		"procedure": {
+			"patterns": [
+				{
+					"match": "([[a-zA-Z]_]\\w*)\\s*\\((.*)",
+					"captures": {
+						"1": { "name": "entity.name.function" },
+						"2": { "patterns": [{ "include": "#evaluate" }] }
+					}
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.operator",
+					"match": "&&|\\|\\||\\+|-|\\*|/|%|>|<|>=|<=|==|!="
+				},
+				{
+					"name": "keyword.assign",
+					"match": "="
+				},
+				{
+					"name": "keyword.control.flow",
+					"match": "->|proc|if|else|for|continue|break|return"
+				}
+			]
+		},
+		"types": {
+			"patterns": [
+				{
+					"name": "storage.type",
+					"match": "i64|f64|u8"
+				},
+				{
+					"name": "storage.modifier",
+					"match": "let|mut"
+				}
+			]
+		},
+		"literals": {
+			"patterns": [
+				{
+					"name": "constant.numeric",
+					"match": "\\d+(\\.\\d*)?"
+				}
+			]
+		},
+		"strings": {
+			"name": "string",
+			"begin": "'|\"",
+			"end": "'|\""
+		},
+		"comments": {
+			"patterns": [
+				{
+					"match": "^([^\\?]*)(\\?.*)$",
+					"captures": {
+						"1": { "patterns": [{"include": "#evaluate"}]},
+						"2": { "name": "comment" }
+					}
+				}
+			]
+		}
+	}
+}
