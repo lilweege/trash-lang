@@ -45,9 +45,10 @@ class Analyzer {
     Type VerifyCall(ASTIndex callIdx, std::unordered_map<std::string_view, ASTIndex>& symbolTable);
     Type VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string_view, ASTIndex>& symbolTable);
 
-    std::vector<Instruction> instructions;
     void AddInstruction(Instruction ins);
 public:
+    std::vector<Instruction> instructions;
+
     Analyzer(File file_, const std::vector<Token>& tokens_, AST& ast_)
         : file{file_}, tokens{tokens_}, ast{ast_}
     {}
@@ -55,4 +56,4 @@ public:
     void VerifyProgram();
 };
 
-void VerifyAST(File file, const std::vector<Token>& tokens, AST& ast);
+std::vector<Instruction> VerifyAST(File file, const std::vector<Token>& tokens, AST& ast);

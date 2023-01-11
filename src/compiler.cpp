@@ -3,6 +3,7 @@
 #include "analyzer.hpp"
 #include "tokenizer.hpp"
 #include "parser.hpp"
+#include "interpreter.hpp"
 
 #include <fstream>
 #include <vector>
@@ -54,7 +55,7 @@ static CompilerOptions ParseArguments(int argc, char** argv) {
         }
     }
 
-    if (opts.srcFn.empty() || opts.binFn.empty()) {
+    if (opts.srcFn.empty()) {
         PrintUsage();
         exit(1);
     }
@@ -88,9 +89,15 @@ void CompilerMain(int argc, char** argv) {
 
     std::vector<Token> tokens = TokenizeEntireSource(file);
     AST ast = ParseEntireProgram(file, tokens);
-    VerifyAST(file, tokens, ast);
-    // TODO: generate code
-    // TODO: emit binary
+    std::vector<Instruction> instructions = VerifyAST(file, tokens, ast);
+
+    if (options.binFn.empty()) {
+        InterpretInstructions(instructions);
+    }
+    else {
+        // TODO: emit binary
+        assert(0);
+    }
 
     fmt::print(stderr, "DONE!\n");
 }

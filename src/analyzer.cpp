@@ -561,7 +561,8 @@ void Analyzer::VerifyProgram() {
     instructions[entryJmpIdx].jmpAddr = entryAddr;
 }
 
-void VerifyAST(File file, const std::vector<Token>& tokens, AST& ast) {
+std::vector<Instruction> VerifyAST(File file, const std::vector<Token>& tokens, AST& ast) {
     Analyzer analyzer{file, tokens, ast};
     analyzer.VerifyProgram();
+    return std::move(analyzer.instructions);
 }
