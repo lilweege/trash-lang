@@ -4,7 +4,7 @@
 #include "tokenizer.hpp"
 
 #include <vector>
-#include <cassert>
+#include <stdint.h>
 
 // Language Grammar
 // TODO: bitwise operators, pointers, struct
