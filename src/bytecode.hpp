@@ -55,9 +55,14 @@ struct Instruction {
         size_t numLocals;
     };
 
+    struct Access {
+        size_t varAddr;
+        size_t accessSize; // size_t is unnecessary, a bool would work
+    };
+
     union {
         Literal lit; // push
-        size_t varAddr; // load_fast, store_fast, alloca
+        Access access; // load_fast, store_fast, alloca
         Operator op; // unaryop, binaryop
         uint64_t jmpAddr; // jmp, jz, jnz
         StackFrame frame; // enter, return

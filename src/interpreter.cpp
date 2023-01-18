@@ -12,7 +12,18 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
     size_t sp = 0;
     size_t bp = sp;
     std::vector<std::string_view> stringLiteralPool;
-    // int cc = 0;
+
+    auto PrintStack = [&]() {
+        assert(sp % 8 == 0);
+        for (size_t i = 0; i < sp; i += 8) {
+            for (size_t j = i; j < i+8; ++j) {
+                fprintf(stderr, "%.2x", st[j]);
+            }
+            fprintf(stderr, " ");
+        }
+        fprintf(stderr, "\n");
+    };
+
     for (size_t ip = 0; ip < instructions.size(); ++ip) {
         Instruction ins = instructions[ip];
 
@@ -42,52 +53,54 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
         }
         else if (ins.opcode == Instruction::Opcode::LOAD_FAST) {
 #if DBG_INS
-            fmt::print(stderr, "LOAD_FAST {}\n", ins.varAddr);
+            fmt::print(stderr, "LOAD_FAST {} ({})\n", ins.access.varAddr, ins.access.accessSize);
 #else
-            memcpy(st + sp, st + ins.varAddr * 8 + bp, 8);
+            memcpy(st + sp, st + ins.access.varAddr * 8 + bp, ins.access.accessSize);
             sp += 8;
 #endif
         }
         else if (ins.opcode == Instruction::Opcode::STORE) {
 #if DBG_INS
-            fmt::print(stderr, "STORE\n");
+            fmt::print(stderr, "STORE ({})\n", ins.access.accessSize);
 #else
             sp -= 8;
             void* addr = st + sp;
             int64_t offset = *(int64_t*) addr;
             sp -= 8;
             void* val = st + sp;
-            memcpy(st + offset, val, 8);
+            memcpy(st + offset, val, ins.access.accessSize);
 #endif
         }
         else if (ins.opcode == Instruction::Opcode::STORE_FAST) {
 #if DBG_INS
-            fmt::print(stderr, "STORE_FAST {}\n", ins.varAddr);
+            fmt::print(stderr, "STORE_FAST {} ({})\n", ins.access.varAddr, ins.access.accessSize);
 #else
             sp -= 8;
-            memcpy(st + ins.varAddr * 8 + bp, st + sp, 8);
+            memset(st + ins.access.varAddr * 8 + bp, 0, 8);
+            memcpy(st + ins.access.varAddr * 8 + bp, st + sp, ins.access.accessSize);
 #endif
         }
         else if (ins.opcode == Instruction::Opcode::ALLOCA) {
 #if DBG_INS
-            fmt::print(stderr, "ALLOCA {}\n", ins.varAddr);
+            fmt::print(stderr, "ALLOCA {}\n", ins.access.varAddr);
 #else
             sp -= 8;
             void* addr = st + sp;
             int64_t offset = *(int64_t*) addr;
-            memcpy(st + ins.varAddr * 8 + bp, &sp, 8);
+            memcpy(st + ins.access.varAddr * 8 + bp, &sp, 8);
             sp = (sp + offset + 7) & (-8);
 #endif
         }
         else if (ins.opcode == Instruction::Opcode::DEREF) {
 #if DBG_INS
-            fmt::print(stderr, "DEREF\n");
+            fmt::print(stderr, "DEREF ({})\n", ins.access.accessSize);
 #else
             int64_t x;
             sp -= 8;
             memcpy(&x, st + sp, 8);
-            memcpy(&x, st + x, 8);
-            memcpy(st + sp, &x, 8);
+            int64_t val = 0;
+            memcpy(&val, st + x, ins.access.accessSize);
+            memcpy(st + sp, &val, 8);
             sp += 8;
 #endif
         }
@@ -189,18 +202,70 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
                 if (ins.jmpAddr == BUILTIN_putf) {
                     double x;
                     sp -= 8;
-                    memcpy(&x, st + sp, sizeof(x));
+                    memcpy(&x, st + sp, 8);
                     sp -= 16;
-                    fmt::print(stderr, "{}\n", x);
+                    fmt::print(stdout, "{}\n", x);
+                    // printf("0x%x\n", x);
                 }
                 else if (ins.jmpAddr == BUILTIN_puti) {
                     int64_t x;
                     sp -= 8;
-                    memcpy(&x, st + sp, sizeof(x));
+                    memcpy(&x, st + sp, 8);
                     sp -= 16;
-                    fmt::print(stderr, "{}\n", x);
+                    fmt::print(stdout, "{}\n", x);
+                    // printf("0x%x\n", x);
                 }
-                else assert(0);
+                else if (ins.jmpAddr == BUILTIN_puts) {
+                    assert(0);
+                }
+                else if (ins.jmpAddr == BUILTIN_itoc) {
+                    int64_t x;
+                    sp -= 8;
+                    memcpy(&x, st + sp, 8);
+                    sp -= 16;
+                    x &= 0xFF;
+                    memcpy(st + sp, &x, 8);
+                    sp += 8;
+                }
+                else if (ins.jmpAddr == BUILTIN_ctoi) {
+                    int64_t x;
+                    sp -= 8;
+                    memcpy(&x, st + sp, 8);
+                    sp -= 16;
+                    memcpy(st + sp, &x, 8);
+                    sp += 8;
+                }
+                else if (ins.jmpAddr == BUILTIN_itof) {
+                    int64_t x;
+                    sp -= 8;
+                    memcpy(&x, st + sp, 8);
+                    sp -= 16;
+                    double y = (double) x;
+                    memcpy(st + sp, &y, 8);
+                    sp += 8;
+                }
+                else if (ins.jmpAddr == BUILTIN_ftoi) {
+                    double x;
+                    sp -= 8;
+                    memcpy(&x, st + sp, 8);
+                    sp -= 16;
+                    int64_t y = (int64_t) x;
+                    memcpy(st + sp, &y, 8);
+                    sp += 8;
+                }
+                else if (ins.jmpAddr == BUILTIN_sqrt) {
+                    double x;
+                    sp -= 8;
+                    memcpy(&x, st + sp, 8);
+                    sp -= 16;
+                    x = sqrtf(x);
+                    memcpy(st + sp, &x, 8);
+                    sp += 8;
+                }
+                else {
+                    fmt::print(stderr, "{}\n", (int64_t) ins.jmpAddr);
+                    assert(0);
+                }
 #endif
             }
             else {
@@ -217,7 +282,7 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
 #else
             int64_t x;
             sp -= 8;
-            memcpy(&x, st + sp, sizeof(x));
+            memcpy(&x, st + sp, 8);
             if (x) ip = ins.jmpAddr - 1;
 #endif
         }
@@ -227,7 +292,7 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
 #else
             int64_t x;
             sp -= 8;
-            memcpy(&x, st + sp, sizeof(x));
+            memcpy(&x, st + sp, 8);
             if (!x) ip = ins.jmpAddr - 1;
 #endif
         }
@@ -297,6 +362,9 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
 #if DBG_INS
 #else
         // fmt::print(stderr, "ip={} bp={} sp={}\n", ip, bp, sp);
+        // PrintStack();
+        // char s[100];
+        // gets(s);
 #endif
     }
 }

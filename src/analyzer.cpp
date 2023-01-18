@@ -43,7 +43,7 @@ void Analyzer::VerifyDefinition(ASTIndex defnIdx, std::unordered_map<std::string
             AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::MUL_BINARYOP_EXPR}});
         }
 
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::ALLOCA, .varAddr=offset});
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::ALLOCA, .access={.varAddr=offset}});
     }
 
     if (defn.initExpr != AST_NULL) {
@@ -53,7 +53,8 @@ void Analyzer::VerifyDefinition(ASTIndex defnIdx, std::unordered_map<std::string
             CompileErrorAt(asgnToken, "Incompatible types when initializing '{}' to type {} (expected {})",
                 ident, TypeKindName(rhsType.kind), TypeKindName(defn.type));
         }
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .varAddr=offset});
+        size_t typeWidth = defn.type == TypeKind::U8 ? 1 : 8;
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .access={.varAddr=offset,.accessSize=typeWidth}});
     }
 
     AssertIdentUnusedInCurrentScope(symbolTable, token);
@@ -75,6 +76,8 @@ Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_vie
     const ASTNode::ASTDefinition& defn = ast.tree[symbolTable[token.text]].defn;
     bool isScalar = defn.arraySize == AST_NULL;
     bool hasSubscript = expr.lvalue.subscript != AST_NULL;
+    size_t typeWidth = defn.type == TypeKind::U8 ? 1 : 8;
+
     // FIXME: Non-scalar expressions are entirely disallowed
     // Maybe change this when strings need to work correctly
     if (isScalar) {
@@ -83,10 +86,10 @@ Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_vie
         }
 
         if (isLoading) {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .varAddr=stackAddrs.back().at(token.text)});
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=typeWidth}});
         }
         else {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .varAddr=stackAddrs.back().at(token.text)});
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=typeWidth}});
         }
     }
     else {
@@ -107,14 +110,14 @@ Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_vie
         }
 
         // Push (i * w + a) where a is the array (pointer) and i is the subscript
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .varAddr=stackAddrs.back().at(token.text)});
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
         AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::ADD_BINARYOP_EXPR}});
 
         if (isLoading) {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::DEREF});
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::DEREF, .access={.accessSize=typeWidth}});
         }
         else {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE});
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE, .access={.accessSize=typeWidth}});
         }
     }
 
