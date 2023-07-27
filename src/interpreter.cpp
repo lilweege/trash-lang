@@ -7,11 +7,39 @@
 
 #define DBG_INS 0
 
+static char UnescapeChar(const char* buff, size_t sz) {
+    if (sz == 0) return '\0';
+    if (sz == 1) return buff[0];
+    if (buff[0] == '\\') {
+        char escapeChar = buff[1];
+        switch (escapeChar) {
+            case 'n': return '\n';
+            case 't': return '\t';
+            case '\\': return '\\';
+            case '\'': return '\'';
+            case '\"': return '\"';
+        }
+    }
+
+    return buff[0];
+}
+
+static std::string UnescapeString(const char* buff, size_t sz) {
+    std::string str;
+    str.reserve(sz);
+    for (size_t i = 0; i < sz; ++i) {
+        char c = UnescapeChar(buff+i, sz-i);
+        if (buff[i] == '\\') ++i;
+        str.push_back(c);
+    }
+    return str;
+}
+
 void InterpretInstructions(const std::vector<Instruction>& instructions) {
     uint8_t st[100000];
     size_t sp = 0;
     size_t bp = sp;
-    std::vector<std::string_view> stringLiteralPool;
+    std::vector<std::string> stringLiteralPool;
 
     auto PrintStack = [&]() {
         assert(sp % 8 == 0);
@@ -42,9 +70,8 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
             else if (ins.lit.kind == TypeKind::F64) { memcpy(st + sp, &ins.lit.f64, 8); sp += 8; }
             else if (ins.lit.kind == TypeKind::U8)  { memcpy(st + sp, &ins.lit.u8, 1);  sp += 8; }
             else if (ins.lit.kind == TypeKind::STR) {
-                assert(0);
                 int64_t poolIdx = stringLiteralPool.size();
-                stringLiteralPool.emplace_back(ins.lit.str.buf, ins.lit.str.sz);
+                stringLiteralPool.emplace_back(UnescapeString(ins.lit.str.buf, ins.lit.str.sz));
                 memcpy(st + sp, &poolIdx, 8);
                 sp += 8;
             }
@@ -204,7 +231,7 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
                     sp -= 8;
                     memcpy(&x, st + sp, 8);
                     sp -= 16;
-                    fmt::print(stdout, "{}\n", x);
+                    fmt::print(stdout, "{}", x);
                     // printf("0x%x\n", x);
                 }
                 else if (ins.jmpAddr == BUILTIN_puti) {
@@ -212,11 +239,15 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
                     sp -= 8;
                     memcpy(&x, st + sp, 8);
                     sp -= 16;
-                    fmt::print(stdout, "{}\n", x);
+                    fmt::print(stdout, "{}", x);
                     // printf("0x%x\n", x);
                 }
                 else if (ins.jmpAddr == BUILTIN_puts) {
-                    assert(0);
+                    int64_t idx;
+                    sp -= 8;
+                    memcpy(&idx, st + sp, 8);
+                    sp -= 16;
+                    fmt::print(stdout, "{}", stringLiteralPool[idx]);
                 }
                 else if (ins.jmpAddr == BUILTIN_itoc) {
                     int64_t x;
