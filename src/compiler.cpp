@@ -4,12 +4,14 @@
 #include "tokenizer.hpp"
 #include "parser.hpp"
 #include "interpreter.hpp"
+#include "generator.hpp"
 
 #include <fstream>
 #include <vector>
 #include <string>
 #include <cassert>
 #include <fmt/core.h>
+#include <fmt/os.h>
 
 
 struct CompilerOptions {
@@ -95,8 +97,9 @@ void CompilerMain(int argc, char** argv) {
         InterpretInstructions(instructions);
     }
     else {
-        // TODO: emit binary
-        assert(0);
+        fmt::ostream binFile = fmt::output_file(options.binFn);
+        EmitInstructions(binFile, Target::X86_64_ELF, instructions);
+        binFile.close();
     }
 
     fmt::print(stderr, "DONE!\n");

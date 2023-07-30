@@ -7,7 +7,7 @@
 
 #define DBG_INS 0
 
-static char UnescapeChar(const char* buff, size_t sz) {
+char UnescapeChar(const char* buff, size_t sz) {
     if (sz == 0) return '\0';
     if (sz == 1) return buff[0];
     if (buff[0] == '\\') {
@@ -24,7 +24,7 @@ static char UnescapeChar(const char* buff, size_t sz) {
     return buff[0];
 }
 
-static std::string UnescapeString(const char* buff, size_t sz) {
+std::string UnescapeString(const char* buff, size_t sz) {
     std::string str;
     str.reserve(sz);
     for (size_t i = 0; i < sz; ++i) {
@@ -35,8 +35,8 @@ static std::string UnescapeString(const char* buff, size_t sz) {
     return str;
 }
 
+uint8_t st[10000000];
 void InterpretInstructions(const std::vector<Instruction>& instructions) {
-    uint8_t st[100000];
     size_t sp = 0;
     size_t bp = sp;
     std::vector<std::string> stringLiteralPool;
@@ -329,8 +329,10 @@ void InterpretInstructions(const std::vector<Instruction>& instructions) {
         }
         else if (ins.opcode == Instruction::Opcode::SAVE) {
 #if DBG_INS
-            fmt::print(stderr, "SAVE\n");
+            fmt::print(stderr, "SAVE {}\n", ins.jmpAddr);
 #else
+            memcpy(st + sp, &ins.jmpAddr, 8);
+            sp += 8;
             memcpy(st + sp, &bp, 8);
             sp += 8;
 #endif

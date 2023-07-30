@@ -29,7 +29,7 @@ struct Instruction {
         JMP_NZ,      // if TOP != 0: ip = x
         JMP_Z,       // if TOP == 0: ip = x
 
-        SAVE,        // TOP = sp
+        SAVE,        // TOP = ip; TOP = sp
         ENTER,       // bp = sp - x; sp += y
         RETURN_VOID, // sp = bp; bp = TOP; jmp TOP
         RETURN_VAL,  // tmp = TOP; sp = bp; bp = TOP; TOP = tmp; swap; jmp TOP
@@ -64,7 +64,7 @@ struct Instruction {
         Literal lit; // push
         Access access; // load_fast, store_fast, alloca
         Operator op; // unaryop, binaryop
-        uint64_t jmpAddr; // jmp, jz, jnz
+        uint64_t jmpAddr; // jmp, jz, jnz, save
         StackFrame frame; // enter, return
     };
 };

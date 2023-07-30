@@ -96,6 +96,9 @@ Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_vie
         if (!hasSubscript) {
             CompileErrorAt(token, "Subscript required for non-scalar variable '{}'", token.text);
         }
+        // Push (i * w + a) where a is the array (pointer) and i is the subscript
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
+
         Type subType = VerifyExpression(expr.lvalue.subscript, symbolTable);
         if (!subType.isScalar || subType.kind != TypeKind::I64) {
             CompileErrorAt(tokens[ast.tree[expr.lvalue.subscript].tokenIdx],
@@ -109,8 +112,6 @@ Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_vie
             AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::MUL_BINARYOP_EXPR}});
         }
 
-        // Push (i * w + a) where a is the array (pointer) and i is the subscript
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
         AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::ADD_BINARYOP_EXPR}});
 
         if (isLoading) {
@@ -154,8 +155,7 @@ Type Analyzer::VerifyCall(ASTIndex callIdx, std::unordered_map<std::string_view,
 
 
     // Push the address of the instruction following the jump
-    size_t pushAddrIdx = instructions.size();
-    AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::I64}});
+    size_t saveAddrIdx = instructions.size();
     AddInstruction(Instruction{.opcode=Instruction::Opcode::SAVE});
 
     if (!procedureDefns.contains(callTok.text)) {
@@ -187,7 +187,9 @@ Type Analyzer::VerifyCall(ASTIndex callIdx, std::unordered_map<std::string_view,
     // Defer resolving this address until all procedures have been generated
     unresolvedCalls.emplace_back(instructions.size(), callTok.text);
     AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP});
-    instructions[pushAddrIdx].lit.i64 = instructions.size();
+
+    // Set the return address to be the next instruction
+    instructions[saveAddrIdx].jmpAddr = instructions.size();
 
     // NOTE: The parser does not allow arrays as return types
     return { defn.returnType, true };
@@ -533,9 +535,16 @@ void Analyzer::VerifyProgram() {
     // Mutual recursion should work out of the box
     const ASTNode& prog = ast.tree[0];
     const auto& procedures = ast.lists[prog.program.procedures];
+    bool firstProc = true;
     for (ASTIndex procIdx : procedures) {
         const ASTNode& proc = ast.tree[procIdx];
         const Token& procName = tokens[proc.tokenIdx];
+        if (firstProc) {
+            if (procName.text != "entry") {
+                CompileErrorAt(procName, "The first procedure in the file must be 'entry'");
+            }
+            firstProc = false;
+        }
         if (procedureDefns.contains(procName.text)) {
             CompileErrorAt(procName, "Redefinition of procedure '{}'", procName.text);
         }
@@ -549,12 +558,13 @@ void Analyzer::VerifyProgram() {
 
 
     size_t entryJmpIdx = instructions.size();
-    AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP});
+    // AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP});
     for (ASTIndex procIdx : procedures) {
         VerifyProcedure(procIdx);
     }
 
     for (auto [jumpIdx, procName] : unresolvedCalls) {
+        // fmt::print("resolving call to '{}': {}\n", procName, procedureDefns.at(procName).instructionNum);
         instructions.at(jumpIdx).jmpAddr = procedureDefns.at(procName).instructionNum;
     }
 

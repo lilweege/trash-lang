@@ -5,9 +5,9 @@
 #include <fmt/os.h>
 
 enum class Target {
-    LINUX_NASM,
-    WINDOWS_NASM,
-    C,
+    X86_64_ELF,
+    POSIX_C,
+    // WINDOWS_NASM,
 };
 
 void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Instruction>& instructions);
