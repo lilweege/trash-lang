@@ -94,35 +94,38 @@ Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_vie
     }
     else {
         if (!hasSubscript) {
-            CompileErrorAt(token, "Subscript required for non-scalar variable '{}'", token.text);
-        }
-        // Push (i * w + a) where a is the array (pointer) and i is the subscript
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
-
-        Type subType = VerifyExpression(expr.lvalue.subscript, symbolTable);
-        if (!subType.isScalar || subType.kind != TypeKind::I64) {
-            CompileErrorAt(tokens[ast.tree[expr.lvalue.subscript].tokenIdx],
-                "Cannot subscript with non-scalar integral variable '{}'",
-                token.text);
-        }
-
-        // Scale by the width of the array type (replace with a left shift when implemented)
-        if (defn.type == TypeKind::I64 || defn.type == TypeKind::F64) {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::I64,.i64=8}});
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::MUL_BINARYOP_EXPR}});
-        }
-
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::ADD_BINARYOP_EXPR}});
-
-        if (isLoading) {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::DEREF, .access={.accessSize=typeWidth}});
+            // CompileErrorAt(token, "Subscript required for non-scalar variable '{}'", token.text);
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
         }
         else {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE, .access={.accessSize=typeWidth}});
+            // Push (i * w + a) where a is the array (pointer) and i is the subscript
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
+
+            Type subType = VerifyExpression(expr.lvalue.subscript, symbolTable);
+            if (!subType.isScalar || subType.kind != TypeKind::I64) {
+                CompileErrorAt(tokens[ast.tree[expr.lvalue.subscript].tokenIdx],
+                    "Cannot subscript with non-scalar integral variable '{}'",
+                    token.text);
+            }
+
+            // Scale by the width of the array type (replace with a left shift when implemented)
+            if (defn.type == TypeKind::I64 || defn.type == TypeKind::F64) {
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::I64,.i64=8}});
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::MUL_BINARYOP_EXPR}});
+            }
+
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::ADD_BINARYOP_EXPR}});
+
+            if (isLoading) {
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::DEREF, .access={.accessSize=typeWidth}});
+            }
+            else {
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE, .access={.accessSize=typeWidth}});
+            }
         }
     }
 
-    return { defn.type, true };
+    return { defn.type, isScalar || hasSubscript };
 }
 
 
@@ -264,10 +267,10 @@ Type Analyzer::VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string
         Type lhsExprType = VerifyExpression(expr.binaryOp.left, symbolTable);
         Type rhsExprType = VerifyExpression(expr.binaryOp.right, symbolTable);
         if (!lhsExprType.isScalar || !rhsExprType.isScalar) {
-            assert(0 && "Unreachable");
-            // CompileErrorAt(token, "Could not apply binary operator {} to non scalar type '{}[]'",
-            //     token.text,
-            //     TypeKindName(lhsExprType.isScalar ? rhsExprType.kind : lhsExprType.kind));
+            // assert(0 && "Unreachable");
+            CompileErrorAt(token, "Could not apply binary operator {} to non scalar type '{}[]'",
+                token.text,
+                TypeKindName(lhsExprType.isScalar ? rhsExprType.kind : lhsExprType.kind));
         }
         if (lhsExprType.kind != rhsExprType.kind) {
             CompileErrorAt(token, "Invalid operands to binary operator ('{}' {} '{}')",
@@ -290,7 +293,7 @@ Type Analyzer::VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string
             return lhsExprType;
         }
     }
-    
+
     assert(0 && "Unreachable");
     return { TypeKind::NONE, 0 };
 }
