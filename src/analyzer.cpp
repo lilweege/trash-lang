@@ -563,7 +563,14 @@ void Analyzer::VerifyProgram() {
         procedures.back().procInfo = proc.procedure;
         procedures.back().procName = procName.text;
         procedures.back().insStartIdx = instructions.size();
+        if (proc.procedure.isExtern) {
+            keepGenerating = false;
+        }
         VerifyProcedure(procIdx);
+        if (proc.procedure.isExtern) {
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::CALL, .lit={.str={procName.text.data(), procName.text.size()}}});
+            keepGenerating = true;
+        }
         procedures.back().insEndIdx = instructions.size();
         for (ASTIndex parameterIdx : ast.lists[proc.procedure.params]) {
             const ASTNode& param = ast.tree[parameterIdx];

@@ -67,10 +67,20 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                     }
                     else assert(0);
                 }
-                out.print("jmp trash_{0}\n", proc.procName);
+                out.print("jmp trash_{}\n", proc.procName);
                 if (proc.procInfo.retType != TypeKind::NONE) {
                     out.print("pop rax\n", proc.procName);
                 }
+            }
+            else if (proc.procInfo.isExtern) {
+                // TODO: Parameters and return value
+                out.print("extern_{0}:\n"
+                          "mov rbp, rsp\n"
+                          "call {0}\n"
+                          "mov rsp, rbp\n"
+                          "pop rbp\n"
+                          "ret\n",
+                          proc.procName);
             }
         }
 
@@ -177,7 +187,6 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
 
         size_t ip = 0;
         for (const auto& proc : procedures) {
-            if (proc.procInfo.isExtern) continue;
             out.print("trash_{}:\n", proc.procName);
             const auto& instructions = proc.instructions;
             for (size_t i = 0; i < instructions.size(); ++i, ++ip) {
@@ -205,7 +214,7 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                         else if (ins.lit.kind == TypeKind::F64) out.print("; PUSH {}\n", ins.lit.f64);
                         else if (ins.lit.kind == TypeKind::U8) out.print("; PUSH {}\n", (char)ins.lit.u8);
                         else if (ins.lit.kind == TypeKind::STR) out.print("; PUSH \"{}\"\n", std::string_view{ins.lit.str.buf, ins.lit.str.sz});
-                        else { out.flush();exit(0); fmt::print("{}\n", (int)ins.lit.kind); assert(0);}
+                        else assert(0);
 #endif
                         if (ins.lit.kind == TypeKind::I64) { out.print("push {}\n", ins.lit.i64); }
                         else if (ins.lit.kind == TypeKind::F64) {
@@ -303,7 +312,6 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                         else if (ins.op.op_kind == ASTKind::NOT_UNARYOP_EXPR) out.print("; UNOP (NOT {})\n", TypeKindName(ins.op.kind));
                         else assert(0);
 #endif
-                        // else assert(0);
                         if (ins.op.kind == TypeKind::I64 || ins.op.kind == TypeKind::U8) {
                             out.print("pop rax\n");
                             if (ins.op.op_kind == ASTKind::NEG_UNARYOP_EXPR) {
@@ -504,6 +512,14 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                         else assert(0);
                     } break;
 
+                    case Instruction::Opcode::CALL: {
+                        std::string_view sv{ins.lit.str.buf, ins.lit.str.sz};
+#if DBG_INS
+                        out.print("; CALL EXTERN {}\n", sv);
+#endif
+                        out.print("jmp extern_{}\n", sv);
+                    } break;
+
                     case Instruction::Opcode::JMP: {
                         if (IS_BUILTIN(ins.jmpAddr)) {
 #if DBG_INS
@@ -522,7 +538,6 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                                 assert(0);
                             }
                         }
-                        // else if ... // TODO: extern func
                         else {
 #if DBG_INS
                             out.print("; JMP {}\n", ins.jmpAddr);

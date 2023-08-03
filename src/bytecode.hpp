@@ -25,6 +25,7 @@ struct Instruction {
         DEREF,       // TOP = *TOP
         UNARY_OP,    // TOP = u(x, TOP)
         BINARY_OP,   // TOP = b(x, TOP1, TOP)
+        CALL,        // call extern func
         JMP,         // ip = x
         JMP_NZ,      // if TOP != 0: ip = x
         JMP_Z,       // if TOP == 0: ip = x
@@ -61,7 +62,7 @@ struct Instruction {
     };
 
     union {
-        Literal lit; // push
+        Literal lit; // push, call (str lit)
         Access access; // load_fast, store_fast, alloca
         Operator op; // unaryop, binaryop
         uint64_t jmpAddr; // jmp, jz, jnz, save
