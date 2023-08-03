@@ -7,7 +7,7 @@
 #include <functional>
 
 const char* TokenKindName(TokenKind kind) {
-    static_assert(static_cast<uint32_t>(TokenKind::TOKEN_COUNT) == 43, "Exhaustive check of token kinds failed");
+    static_assert(static_cast<uint32_t>(TokenKind::TOKEN_COUNT) == 46, "Exhaustive check of token kinds failed");
     const std::array<const char*, static_cast<uint32_t>(TokenKind::TOKEN_COUNT)> TokenKindNames{
         "NONE",
         "COMMENT",
@@ -17,6 +17,9 @@ const char* TokenKindName(TokenKind kind) {
         "ELSE",
         "FOR",
         "PROC",
+        "CDECL",
+        "EXTERN",
+        "PUBLIC",
         "LET",
         "MUT",
         "RETURN",
@@ -380,6 +383,9 @@ bool Tokenizer::PollTokenWithComments() {
                 else if (curToken.text == "i64")      curToken.kind = TokenKind::I64;
                 else if (curToken.text == "f64")      curToken.kind = TokenKind::F64;
                 else if (curToken.text == "proc")     curToken.kind = TokenKind::PROC;
+                else if (curToken.text == "cdecl")    curToken.kind = TokenKind::CDECL;
+                else if (curToken.text == "extern")   curToken.kind = TokenKind::EXTERN;
+                else if (curToken.text == "public")   curToken.kind = TokenKind::PUBLIC;
                 else if (curToken.text == "let")      curToken.kind = TokenKind::LET;
                 else if (curToken.text == "mut")      curToken.kind = TokenKind::MUT;
                 else if (curToken.text == "return")   curToken.kind = TokenKind::RETURN;
@@ -428,7 +434,7 @@ void Tokenizer::ConsumeToken() {
     curToken.kind = TokenKind::NONE;
 }
 
-std::vector<Token> TokenizeEntireSource(File file) {
+std::vector<Token> TokenizeEntireSource(const std::vector<File>& files) {
     // It's debatable if it's better to tokenize the entire source and then parse all tokens,
     // or interleave tokenizing with parsing.
     // Notably, storing tokens contiguously and referring to them by pointer reduces the size of each AST node.
@@ -436,12 +442,13 @@ std::vector<Token> TokenizeEntireSource(File file) {
     std::vector<Token> tokens;
     tokens.emplace_back(); // Reserved empty token
 
-    for (Tokenizer tokenizer{file};
-        tokenizer.PollToken();
-        tokenizer.ConsumeToken())
-    {
-        tokens.push_back(tokenizer.curToken);
-        // fmt::print("{}\n", tokens.back());
+    for (const File& file : files) {
+        for (Tokenizer tokenizer{file};
+            tokenizer.PollToken();
+            tokenizer.ConsumeToken())
+        {
+            tokens.push_back(tokenizer.curToken);
+        }
     }
 
     return tokens;

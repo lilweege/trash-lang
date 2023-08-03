@@ -827,11 +827,52 @@ ASTList Parser::ParseBody() {
 ASTIndex Parser::ParseProcedure() {
     ExpectAndConsumeToken(TokenKind::PROC,
         "Invalid top level declaration, expected \"proc\"");
+
+    // Optional procedure annotations
+    bool isCdecl = false;
+    bool isExtern = false;
+    bool isPublic = false;
+    while (true) {
+        const Token& annotation = PeekCurrentToken();
+        if (annotation.kind == TokenKind::CDECL) {
+            ++tokenIdx;
+            if (isCdecl)
+                CompileErrorAt(annotation, "Duplicate annotation \"cdecl\"");
+            isCdecl = true;
+        }
+        else if (annotation.kind == TokenKind::EXTERN) {
+            ++tokenIdx;
+            if (isExtern)
+                CompileErrorAt(annotation, "Duplicate annotation \"extern\"");
+            isExtern = true;
+        }
+        else if (annotation.kind == TokenKind::PUBLIC) {
+            ++tokenIdx;
+            if (isPublic)
+                CompileErrorAt(annotation, "Duplicate annotation \"public\"");
+            isPublic = true;
+        }
+        else break;
+    }
+    // Annotation rules:
+    // !(public & extern)
+    // cdecl => extern
+    if (isCdecl && !isExtern) {
+        CompileErrorAt(PeekCurrentToken(), "Non-extern procedure cannot be declared \"cdecl\"");
+    }
+    if (isPublic && isExtern) {
+        CompileErrorAt(PeekCurrentToken(), "Procedure cannot be declared \"public\" and \"extern\"");
+    }
+
     ExpectAndConsumeToken(TokenKind::IDENTIFIER,
         "Expected identifier after \"proc\"");
     ASTIndex proc = NewNodeFromLastToken(ASTKind::PROCEDURE);
     ExpectAndConsumeToken(TokenKind::LPAREN,
         "Expected \"(\" after procedure name");
+
+    ast.tree[proc].procedure.isCdecl = isCdecl;
+    ast.tree[proc].procedure.isExtern = isExtern;
+    ast.tree[proc].procedure.isPublic = isPublic;
 
     const Token& nextTok = PeekCurrentToken();
     if (nextTok.kind == TokenKind::RPAREN) {
@@ -864,19 +905,18 @@ ASTIndex Parser::ParseProcedure() {
     }
 
     // Optional return type
-    const Token* arrowOrCurly = &PeekCurrentToken();
-    if (arrowOrCurly->kind == TokenKind::ARROW) {
+    const Token& arrowOrCurly = PeekCurrentToken();
+    if (arrowOrCurly.kind == TokenKind::ARROW) {
         ++tokenIdx;
         auto [retType, arrSize] = ParseType();
         if (arrSize != AST_NULL) {
-            CompileErrorAt(*arrowOrCurly, "Returning arrays is not allowed!");
+            CompileErrorAt(arrowOrCurly, "Returning arrays is not allowed!");
         }
 
         ast.tree[proc].procedure.retType = retType;
-        arrowOrCurly = &PeekCurrentToken();
     }
 
-    ast.tree[proc].procedure.body = ParseBody();
+    ast.tree[proc].procedure.body = isExtern ? AST_EMPTY : ParseBody();
 
     return proc;
 }
@@ -904,10 +944,10 @@ void Parser::ParseEntireProgram() {
     ParseProgram();
 }
 
-AST ParseEntireProgram(File file, const std::vector<Token>& tokens) {
+AST ParseEntireProgram(const std::vector<Token>& tokens) {
     AST ast;
-    Parser parser{file, tokens, ast};
+    Parser parser{tokens, ast};
     parser.ParseEntireProgram();
-    parser.PrintAST();
+    // parser.PrintAST();
     return ast;
 }

@@ -15,7 +15,7 @@
 
 
 struct CompilerOptions {
-    std::string srcFn;
+    std::vector<std::string> srcFn;
     std::string binFn;
     // ...
 };
@@ -24,34 +24,47 @@ static void PrintUsage() {
     std::vector<std::pair<char, std::string>> options;
     fmt::print(stderr,
         "Usage: trashc [options]\n"
-        "-i <file>   The name of the input source file to be compiled.\n"
-        "-o <file>   The name of the compiled output binary file.\n"
-        "-h          Displays this information\n"
+        "-i <files>   The name(s) of the input source file(s) to be compiled.\n"
+        "-o <file>    The name of the compiled output binary file.\n"
+        "-h           Displays this information\n"
     );
 }
 
 static CompilerOptions ParseArguments(int argc, char** argv) {
     CompilerOptions opts{};
     std::vector<std::string> args(argv+1, argv+argc);
-    for (auto it = begin(args); it != end(args); ++it) {
+
+    enum class Reading { None, Input, Output };
+    Reading current = Reading::None;
+
+    for (auto it = cbegin(args); it != cend(args); ++it) {
         const std::string& arg = *it;
         if (arg == "-h") {
             PrintUsage();
             exit(0);
         }
-
-        if (++it == cend(args)) {
-            PrintUsage();
-            exit(1);
-        }
-
-        if (arg == "-i") {
-            opts.srcFn = std::move(*it);
+        else if (arg == "-i") {
+            current = Reading::Input;
+            if (it+1 == cend(args)) {
+                PrintUsage();
+                exit(1);
+            }
         }
         else if (arg == "-o") {
+            current = Reading::Output;
+            if (it+1 == cend(args)) {
+                PrintUsage();
+                exit(1);
+            }
+        }
+        else if (current == Reading::Input) {
+            opts.srcFn.emplace_back(std::move(*it));
+        }
+        else if (current == Reading::Output) {
             opts.binFn = std::move(*it);
         }
         else {
+            fmt::print("bad\n");
             PrintUsage();
             exit(1);
         }
@@ -61,6 +74,7 @@ static CompilerOptions ParseArguments(int argc, char** argv) {
         PrintUsage();
         exit(1);
     }
+
     return opts;
 }
 
@@ -86,19 +100,24 @@ void CompilerMain(int argc, char** argv) {
     assert(argc > 0);
 
     CompilerOptions options{ParseArguments(argc, argv)};
-    std::string source = ReadEntireFile(options.srcFn);
-    File file{options.srcFn, source};
 
-    std::vector<Token> tokens = TokenizeEntireSource(file);
-    AST ast = ParseEntireProgram(file, tokens);
-    std::vector<Instruction> instructions = VerifyAST(file, tokens, ast);
+    std::vector<std::string> sources;
+    for (const auto& fn : options.srcFn)
+        sources.emplace_back(ReadEntireFile(fn));
+    std::vector<File> files;
+    for (size_t i = 0; i < sources.size(); ++i)
+         files.push_back(File{options.srcFn[i], sources[i]});
+
+    std::vector<Token> tokens = TokenizeEntireSource(files);
+    AST ast = ParseEntireProgram(tokens);
+    std::vector<Procedure> procedures = VerifyAST(tokens, ast);
 
     if (options.binFn.empty()) {
-        InterpretInstructions(instructions);
+        InterpretInstructions(procedures);
     }
     else {
         fmt::ostream binFile = fmt::output_file(options.binFn);
-        EmitInstructions(binFile, Target::X86_64_ELF, instructions);
+        EmitInstructions(binFile, Target::X86_64_ELF, procedures);
         binFile.close();
     }
 

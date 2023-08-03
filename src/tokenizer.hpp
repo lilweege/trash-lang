@@ -16,6 +16,9 @@ enum class TokenKind : uint8_t {
     ELSE,
     FOR,
     PROC,
+    CDECL,
+    EXTERN,
+    PUBLIC,
     LET,
     MUT,
     RETURN,
@@ -62,6 +65,7 @@ struct FileLocation {
 
 // TODO: use bitfield to eliminate wasted 7 bytes after kind
 struct Token {
+    const File* file;
     std::string_view text;
     FileLocation pos;
     TokenKind kind;
@@ -88,14 +92,16 @@ struct fmt::formatter<Token> {
 
 
 class Tokenizer {
-    const File file;
+    const File& file;
     FileLocation curPos{};
 public:
     Token curToken{};
 
-    explicit Tokenizer(File file_)
+    explicit Tokenizer(const File& file_)
         : file{file_}
-    {}
+    {
+        curToken.file = &file;
+    }
 
     // Emits error and exits on error
     // Returns false when tokenizing EOF
@@ -105,5 +111,5 @@ public:
     void ConsumeToken();
 };
 
-std::vector<Token> TokenizeEntireSource(File file);
+std::vector<Token> TokenizeEntireSource(const std::vector<File>& files);
 

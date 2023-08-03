@@ -116,6 +116,9 @@ struct ASTNode {
         ASTList params;
         ASTList body;
         TypeKind retType;
+        bool isCdecl;
+        bool isExtern;
+        bool isPublic;
     };
 
     struct ASTUnaryOperator {
@@ -213,7 +216,6 @@ struct AST {
 };
 
 class Parser {
-    const File file;
     const std::vector<Token>& tokens;
     TokenIndex tokenIdx{};
     AST& ast;
@@ -248,8 +250,8 @@ class Parser {
 
 
 public:
-    Parser(File file_, const std::vector<Token>& tokens_, AST& ast_)
-        : file{file_}, tokens{tokens_}, ast{ast_}
+    Parser(const std::vector<Token>& tokens_, AST& ast_)
+        : tokens{tokens_}, ast{ast_}
     {}
 
     void ParseEntireProgram();
@@ -257,7 +259,7 @@ public:
     void PrintAST(ASTIndex rootIdx, uint32_t depth) const;
 };
 
-AST ParseEntireProgram(File file, const std::vector<Token>& tokens);
+AST ParseEntireProgram(const std::vector<Token>& tokens);
 
 static_assert(std::is_trivial_v<ASTNode>);
 static_assert(sizeof(ASTNode) == 24); // Ensure this struct doesn't accidentally get bigger

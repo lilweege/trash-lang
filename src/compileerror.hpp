@@ -17,7 +17,7 @@ struct File {
 // Convenient when "file" is local or member
 #define CompileErrorAt(token, format, ...) CompileErrorAtToken(file, token, format, __VA_ARGS__)
 
-#define CompileErrorAtToken(file, token, format, ...) CompileErrorAtLocation(file, (token).pos, format, __VA_ARGS__)
+#define CompileErrorAtToken(file, token, format, ...) CompileErrorAtLocation(*(token).file, (token).pos, format, __VA_ARGS__)
 
 #define CompileErrorAtLocation(file, pos, format, ...) do { \
         fmt::print(stderr, "{}\n", CompileErrorMessage((file).filename, (pos).line, (pos).col, \

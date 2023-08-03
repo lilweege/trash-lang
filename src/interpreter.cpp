@@ -36,7 +36,12 @@ std::string UnescapeString(const char* buff, size_t sz) {
 }
 
 uint8_t st[10000000];
-void InterpretInstructions(const std::vector<Instruction>& instructions) {
+void InterpretInstructions(const std::vector<Procedure>& procedures) {
+    // Flatten procedures to list of instructions
+    std::vector<Instruction> instructions;
+    for (const auto& proc : procedures) {
+        instructions.insert(instructions.end(), proc.instructions.begin(), proc.instructions.end());
+    }
     size_t sp = 0;
     size_t bp = sp;
     std::vector<std::string> stringLiteralPool;

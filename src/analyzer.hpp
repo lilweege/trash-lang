@@ -10,6 +10,14 @@ struct Type {
     bool isScalar;
 };
 
+struct Procedure {
+    std::vector<Instruction> instructions;
+    ASTNode::ASTProcedure procInfo;
+    std::string_view procName;
+    size_t insStartIdx, insEndIdx;
+    std::vector<ASTNode::ASTDefinition> params;
+};
+
 class Analyzer {
     struct ProcedureDefn {
         std::vector<ASTIndex> paramTypes;
@@ -18,23 +26,23 @@ class Analyzer {
         size_t instructionNum;
     };
 
-    const File file;
     const std::vector<Token>& tokens;
     AST& ast;
     std::unordered_map<std::string_view, ProcedureDefn> procedureDefns;
     std::vector<std::pair<size_t, std::string_view>> unresolvedCalls;
 
     ProcedureDefn* currProc;
-    int entryAddr;
+    // int entryAddr;
     int loopDepth{};
     int blockDepth{};
-    bool hasEntry{};
+    // bool hasEntry{};
     bool returnAtTopLevel;
     size_t maxNumVariables;
     std::vector<std::vector<size_t>> breakAddrs;
     std::vector<std::vector<size_t>> continueAddrs;
     std::vector<std::unordered_map<std::string_view, size_t>> stackAddrs;
     bool keepGenerating = true;
+    std::vector<Instruction> instructions;
 
     void AssertIdentUnusedInCurrentScope(const std::unordered_map<std::string_view, ASTIndex>& symbolTable, const Token& ident);
     void VerifyProcedure(ASTIndex procIdx);
@@ -47,13 +55,13 @@ class Analyzer {
 
     void AddInstruction(Instruction ins);
 public:
-    std::vector<Instruction> instructions;
+    std::vector<Procedure> procedures;
 
-    Analyzer(File file_, const std::vector<Token>& tokens_, AST& ast_)
-        : file{file_}, tokens{tokens_}, ast{ast_}
+    Analyzer(const std::vector<Token>& tokens_, AST& ast_)
+        : tokens{tokens_}, ast{ast_}
     {}
 
     void VerifyProgram();
 };
 
-std::vector<Instruction> VerifyAST(File file, const std::vector<Token>& tokens, AST& ast);
+std::vector<Procedure> VerifyAST(const std::vector<Token>& tokens, AST& ast);

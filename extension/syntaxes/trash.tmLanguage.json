@@ -49,7 +49,7 @@
 				},
 				{
 					"name": "keyword.control.flow",
-					"match": "->|proc|if|else|for|continue|break|return"
+					"match": "->|proc|extern|cdecl|public|if|else|for|continue|break|return"
 				}
 			]
 		},

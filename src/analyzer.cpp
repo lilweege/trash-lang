@@ -477,11 +477,11 @@ void Analyzer::VerifyProcedure(ASTIndex procIdx) {
     currProc = &procDefn;
     procDefn.instructionNum = instructions.size();
 
-    if (!hasEntry && token.text == "entry") {
-        hasEntry = true;
-        entryAddr = instructions.size();
-        // TODO: Check arguments and return type of main
-    }
+    // if (!hasEntry && token.text == "entry") {
+    //     hasEntry = true;
+    //     entryAddr = instructions.size();
+    //     // TODO: Check arguments and return type of main
+    // }
 
     returnAtTopLevel = false;
     maxNumVariables = 0;
@@ -495,15 +495,17 @@ void Analyzer::VerifyProcedure(ASTIndex procIdx) {
     VerifyStatements(params, symbolTable);
     keepGenerating = true;
 
-    VerifyStatements(procedure.body, symbolTable);
-    if (!returnAtTopLevel) {
-        if (procedure.retType != TypeKind::NONE) {
-            CompileErrorAt(token, "Non-void procedure '{}' did not return in all control paths", token.text);
+    if (!proc.procedure.isExtern) {
+        VerifyStatements(procedure.body, symbolTable);
+        if (!returnAtTopLevel) {
+            if (procedure.retType != TypeKind::NONE) {
+                CompileErrorAt(token, "Non-void procedure '{}' did not return in all control paths", token.text);
+            }
+            bool hasReturnValue = procDefn.returnType != TypeKind::NONE;
+            AddInstruction(Instruction{.opcode=hasReturnValue ?
+                Instruction::Opcode::RETURN_VAL :
+                Instruction::Opcode::RETURN_VOID});
         }
-        bool hasReturnValue = procDefn.returnType != TypeKind::NONE;
-        AddInstruction(Instruction{.opcode=hasReturnValue ?
-            Instruction::Opcode::RETURN_VAL :
-            Instruction::Opcode::RETURN_VOID});
     }
 
     procDefn.stackSpace = maxNumVariables - procDefn.paramTypes.size();
@@ -537,17 +539,10 @@ void Analyzer::VerifyProgram() {
     // Collect all procedure definitions and "forward declare" them.
     // Mutual recursion should work out of the box
     const ASTNode& prog = ast.tree[0];
-    const auto& procedures = ast.lists[prog.program.procedures];
-    bool firstProc = true;
-    for (ASTIndex procIdx : procedures) {
+    const auto& procList = ast.lists[prog.program.procedures];
+    for (ASTIndex procIdx : procList) {
         const ASTNode& proc = ast.tree[procIdx];
         const Token& procName = tokens[proc.tokenIdx];
-        if (firstProc) {
-            if (procName.text != "entry") {
-                CompileErrorAt(procName, "The first procedure in the file must be 'entry'");
-            }
-            firstProc = false;
-        }
         if (procedureDefns.contains(procName.text)) {
             CompileErrorAt(procName, "Redefinition of procedure '{}'", procName.text);
         }
@@ -559,11 +554,21 @@ void Analyzer::VerifyProgram() {
             };
     }
 
-
-    size_t entryJmpIdx = instructions.size();
+    // size_t entryJmpIdx = instructions.size();
     // AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP});
-    for (ASTIndex procIdx : procedures) {
+    for (ASTIndex procIdx : procList) {
+        const ASTNode& proc = ast.tree[procIdx];
+        const Token& procName = tokens[proc.tokenIdx];
+        procedures.emplace_back();
+        procedures.back().procInfo = proc.procedure;
+        procedures.back().procName = procName.text;
+        procedures.back().insStartIdx = instructions.size();
         VerifyProcedure(procIdx);
+        procedures.back().insEndIdx = instructions.size();
+        for (ASTIndex parameterIdx : ast.lists[proc.procedure.params]) {
+            const ASTNode& param = ast.tree[parameterIdx];
+            procedures.back().params.push_back(param.defn);
+        }
     }
 
     for (auto [jumpIdx, procName] : unresolvedCalls) {
@@ -571,14 +576,18 @@ void Analyzer::VerifyProgram() {
         instructions.at(jumpIdx).jmpAddr = procedureDefns.at(procName).instructionNum;
     }
 
-    if (!hasEntry) {
-        CompileErrorAt(tokens.back(), "Missing entrypoint procedure 'entry'");
+    for (auto& proc : procedures) {
+        for (size_t i = proc.insStartIdx; i < proc.insEndIdx; ++i)
+            proc.instructions.push_back(instructions[i]);
     }
-    instructions[entryJmpIdx].jmpAddr = entryAddr;
+    // if (!hasEntry) {
+    //     CompileErrorAt(tokens.back(), "Missing entrypoint procedure 'entry'");
+    // }
+    // instructions[entryJmpIdx].jmpAddr = entryAddr;
 }
 
-std::vector<Instruction> VerifyAST(File file, const std::vector<Token>& tokens, AST& ast) {
-    Analyzer analyzer{file, tokens, ast};
+std::vector<Procedure> VerifyAST(const std::vector<Token>& tokens, AST& ast) {
+    Analyzer analyzer{tokens, ast};
     analyzer.VerifyProgram();
-    return std::move(analyzer.instructions);
+    return std::move(analyzer.procedures);
 }

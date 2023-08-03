@@ -1,5 +1,6 @@
 #pragma once
 
+#include "analyzer.hpp"
 #include "parser.hpp"
 #include "bytecode.hpp"
 #include <fmt/os.h>
@@ -10,4 +11,4 @@ enum class Target {
     // WINDOWS_NASM,
 };
 
-void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Instruction>& instructions);
+void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Procedure>& procedures);
