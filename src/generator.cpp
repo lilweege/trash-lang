@@ -73,14 +73,69 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                 }
             }
             else if (proc.procInfo.isExtern) {
-                // TODO: Parameters and return value
-                out.print("extern_{0}:\n"
-                          "mov rbp, rsp\n"
-                          "call {0}\n"
-                          "mov rsp, rbp\n"
-                          "pop rbp\n"
-                          "ret\n",
+                out.print("extern_{}:\n", proc.procName);
+                size_t numInts = 0;
+                size_t numFloats = 0;
+                for (ASTNode::ASTDefinition param : proc.params) {
+                    TypeKind kind = param.type;
+                    bool isPointer = param.arraySize != 0;
+                    if (isPointer || kind == TypeKind::I64 || kind == TypeKind::U8) {
+                        ++numInts;
+                    }
+                    else if (kind == TypeKind::F64) {
+                        ++numFloats;
+                    }
+                }
+                for (size_t i = proc.params.size(); i-- > 0;) {
+                    ASTNode::ASTDefinition param = proc.params[i];
+                    TypeKind kind = param.type;
+                    bool isPointer = param.arraySize != 0;
+                    if (isPointer || kind == TypeKind::I64 || kind == TypeKind::U8) {
+                        switch (--numInts) {
+                            case 0: out.print("pop rdi\n"); break;
+                            case 1: out.print("pop rsi\n"); break;
+                            case 2: out.print("pop rdx\n"); break;
+                            case 3: out.print("pop rcx\n"); break;
+                            case 4: out.print("pop r8\n"); break;
+                            case 5: out.print("pop r9\n"); break;
+                            default: assert(0);
+                        }
+                    }
+                    else if (kind == TypeKind::F64) {
+                        out.print("pop r10\n");
+                        switch (--numFloats) {
+                            case 0: out.print("movq xmm0, r10\n"); break;
+                            case 1: out.print("movq xmm1, r10\n"); break;
+                            case 2: out.print("movq xmm2, r10\n"); break;
+                            case 3: out.print("movq xmm3, r10\n"); break;
+                            case 4: out.print("movq xmm4, r10\n"); break;
+                            case 5: out.print("movq xmm5, r10\n"); break;
+                            case 6: out.print("movq xmm6, r10\n"); break;
+                            case 7: out.print("movq xmm7, r10\n"); break;
+                            default: assert(0);
+                        }
+                    }
+                    else assert(0);
+                }
+                out.print("mov rbp, rsp\n"
+                          "call {}\n",
                           proc.procName);
+
+                if (proc.procInfo.retType == TypeKind::NONE) {
+                    out.print("mov rsp, rbp\n"
+                              "pop rbp\n"
+                              "ret\n");
+                }
+                else {
+                    out.print("mov rsp, rbp\n"
+                              "pop rbp\n"
+                              "push rax\n"
+                              "pop rax\n"
+                              "pop rbx\n"
+                              "push rax\n"
+                              "push rbx\n"
+                              "ret\n");
+                }
             }
         }
 
