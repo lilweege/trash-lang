@@ -248,20 +248,6 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                 out.print("INS_{}:\n", ip);
                 Instruction ins = instructions[i];
 
-                // Hack because the stack actually grows down
-                // Otherwise, the emulator would have to change
-                // FIXME: This breaks compatability with C arrays
-                if (ins.op.op_kind == ASTKind::ADD_BINARYOP_EXPR) {
-                    if (i + 1 < instructions.size()) {
-                        Instruction::Opcode nextKind = instructions[i + 1].opcode;
-                        if (nextKind == Instruction::Opcode::DEREF ||
-                            nextKind == Instruction::Opcode::STORE)
-                        {
-                            ins.op.op_kind = ASTKind::SUB_BINARYOP_EXPR;
-                        }
-                    }
-                }
-
                 switch (ins.opcode) {
                     case Instruction::Opcode::INLINE: {
 #if DBG_INS
@@ -315,7 +301,7 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
 #endif
                         out.print("pop rax\n"); // TOP
                         out.print("pop rbx\n"); // TOP1
-                        out.print("mov {} [rax-8], {}\n", // *TOP = TOP1
+                        out.print("mov {} [rax], {}\n", // *TOP = TOP1
                                   ins.access.accessSize == 8 ? "QWORD" :
                                   ins.access.accessSize == 4 ? "DWORD" :
                                   ins.access.accessSize == 2 ? "WORD" : "BYTE",
@@ -346,6 +332,8 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                         out.print("pop rax\n"); // TOP
                         out.print("mov QWORD [rbp-{}*8-8], rsp\n", // *x = addr
                                   ins.access.varAddr);
+                        out.print("sub QWORD [rbp-{}*8-8], rax\n",
+                                  ins.access.varAddr);
                         out.print("sub rsp, rax\n"); // sp = alloca(TOP)
                         out.print("sub rsp, 7\n");
                         out.print("mov rax, 0xFFFFFFFFFFFFFFF8\n");
@@ -358,7 +346,7 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
 #endif
                         out.print("pop rax\n"); // TOP
                         out.print("xor ebx, ebx\n");
-                        out.print("mov {}, {} [rax-8]\n", // TOP = *TOP1
+                        out.print("mov {}, {} [rax]\n", // TOP = *TOP1
                                   ins.access.accessSize == 8 ? "rbx" :
                                   ins.access.accessSize == 4 ? "ebx" :
                                   ins.access.accessSize == 2 ? "bx" : "bl",
