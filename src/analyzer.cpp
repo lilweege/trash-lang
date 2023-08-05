@@ -536,11 +536,10 @@ void Analyzer::VerifyProcedure(ASTIndex procIdx) {
                 Instruction::Opcode::RETURN_VAL :
                 Instruction::Opcode::RETURN_VOID});
         }
+        procDefn.stackSpace = maxNumVariables - procDefn.paramTypes.size();
+        instructions[enterIdx].frame.numLocals = procDefn.stackSpace;
+        instructions[enterIdx].frame.numParams = procDefn.paramTypes.size();
     }
-
-    procDefn.stackSpace = maxNumVariables - procDefn.paramTypes.size();
-    instructions[enterIdx].frame.numLocals = procDefn.stackSpace;
-    instructions[enterIdx].frame.numParams = procDefn.paramTypes.size();
 
     stackAddrs.pop_back();
 }
