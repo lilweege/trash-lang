@@ -91,12 +91,14 @@ ASTIndex Parser::NewNodeFromLastToken(ASTKind kind) {
 }
 
 const Token& Parser::PeekCurrentToken() const {
-    assert(tokenIdx < tokens.size());
+    if (tokenIdx >= tokens.size())
+        CompileErrorAt(tokens.back(), "Unexpected end of file (did you forget a closing curly brace?)");
     return tokens[tokenIdx];
 }
 
 const Token& Parser::PollCurrentToken() {
-    assert(tokenIdx < tokens.size());
+    if (tokenIdx >= tokens.size())
+        CompileErrorAt(tokens.back(), "Unexpected end of file (did you forget a closing curly brace?)");
     return tokens[tokenIdx++];
 }
 

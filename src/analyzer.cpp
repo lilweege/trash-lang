@@ -57,7 +57,6 @@ void Analyzer::VerifyDefinition(ASTIndex defnIdx, std::unordered_map<std::string
 
     if (hasInitExpr) {
         Type rhsType = VerifyExpression(defn.initExpr, symbolTable);
-        // assert(rhsType.isScalar);
         if (defn.type != rhsType.kind) {
             CompileErrorAt(asgnToken, "Incompatible types when initializing '{}' to type {}{} (expected {}{})",
                            ident,
@@ -109,8 +108,12 @@ Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_vie
     }
     else {
         if (!hasSubscript) {
-            // CompileErrorAt(token, "Subscript required for non-scalar variable '{}'", token.text);
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
+            if (isLoading) {
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
+            }
+            else {
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
+            }
         }
         else {
             // Push (i * w + a) where a is the array (pointer) and i is the subscript
@@ -458,15 +461,17 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
             bool isScalar = defn.arraySize == AST_NULL;
             bool hasSubscript = ast.tree[stmt.asgn.lvalue].lvalue.subscript != AST_NULL;
             Type rhsType = VerifyExpression(stmt.asgn.rvalue, symbolTable);
-            assert(rhsType.isScalar);
-            if (defn.type != rhsType.kind) {
-                CompileErrorAt(tokens[stmt.tokenIdx], "Incompatible types when assigning '{}' to type '{}' (expected '{}')",
-                    lhsTok.text, TypeKindName(rhsType.kind), TypeKindName(defn.type));
+            // assert(rhsType.isScalar);
+            bool isRvalueScalar = isScalar || hasSubscript;
+            if (isRvalueScalar != rhsType.isScalar || defn.type != rhsType.kind) {
+                CompileErrorAt(tokens[stmt.tokenIdx], "Incompatible types when assigning '{}' to type {}{} (expected {}{})",
+                               lhsTok.text,
+                               TypeKindName(rhsType.kind),
+                               rhsType.isScalar ? "" : "[]",
+                               TypeKindName(defn.type),
+                               isRvalueScalar ? "" : "[]");
             }
-            if (!isScalar && !hasSubscript) {
-                CompileErrorAt(tokens[stmt.tokenIdx], "Subscript required for non-scalar variable '{}'", lhsTok.text);
-            }
-            else if (isScalar && hasSubscript) {
+            if (isScalar && hasSubscript) {
                 CompileErrorAt(tokens[stmt.tokenIdx], "Cannot subscript scalar variable '{}'", lhsTok.text);
             }
 
