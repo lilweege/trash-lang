@@ -28,7 +28,6 @@ struct Instruction {
         BINARY_OP,   // TOP = b(x, TOP1, TOP)
         CALL,        // call extern func
         JMP,         // ip = x
-        JMP_NZ,      // if TOP != 0: ip = x
         JMP_Z,       // if TOP == 0: ip = x
 
         SAVE,        // TOP = ip; TOP = sp
@@ -52,6 +51,11 @@ struct Instruction {
         ASTKind op_kind;
     };
 
+    struct ConditionalJump {
+        size_t jmpAddr;
+        size_t accessSize;
+    };
+
     struct StackFrame {
         size_t numParams;
         size_t numLocals;
@@ -59,7 +63,7 @@ struct Instruction {
 
     struct Access {
         size_t varAddr;
-        size_t accessSize; // size_t is unnecessary, a bool would work
+        size_t accessSize;
     };
 
     union {
@@ -67,7 +71,8 @@ struct Instruction {
         Literal lit; // push
         Access access; // load_fast, store_fast, alloca
         Operator op; // unaryop, binaryop
-        uint64_t jmpAddr; // jmp, jz, jnz, save
+        ConditionalJump jmp; // jz
+        uint64_t jmpAddr; // jmp, save
         StackFrame frame; // enter, return
     };
 };

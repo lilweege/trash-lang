@@ -596,21 +596,15 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                         }
                     } break;
 
-                    case Instruction::Opcode::JMP_NZ: {
-#if DBG_INS
-                        out.print("; JMP_NZ {}\n", ins.jmpAddr);
-#endif
-                        out.print("pop rax\n");
-                        out.print("cmp rax, 0\n");
-                        out.print("jne INS_{}\n", ins.jmpAddr); // if TOP != 0: ip = x
-                    } break;
-
                     case Instruction::Opcode::JMP_Z: {
 #if DBG_INS
                         out.print("; JMP_Z {}\n", ins.jmpAddr);
 #endif
                         out.print("pop rax\n");
-                        out.print("cmp rax, 0\n");
+                        out.print("cmp {}, 0\n",
+                                  ins.access.accessSize == 8 ? "rax" :
+                                  ins.access.accessSize == 4 ? "eax" :
+                                  ins.access.accessSize == 2 ? "ax" : "al");
                         out.print("je INS_{}\n", ins.jmpAddr); // if TOP == 0: ip = x
                     } break;
 

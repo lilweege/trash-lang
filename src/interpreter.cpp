@@ -312,16 +312,6 @@ void InterpretInstructions(const std::vector<Procedure>& procedures) {
 #endif
             }
         }
-        else if (ins.opcode == Instruction::Opcode::JMP_NZ) {
-#if DBG_INS
-            fmt::print(stderr, "JMP_NZ {}\n", ins.jmpAddr);
-#else
-            int64_t x;
-            sp -= 8;
-            memcpy(&x, st + sp, 8);
-            if (x) ip = ins.jmpAddr - 1;
-#endif
-        }
         else if (ins.opcode == Instruction::Opcode::JMP_Z) {
 #if DBG_INS
             fmt::print(stderr, "JMP_Z {}\n", ins.jmpAddr);

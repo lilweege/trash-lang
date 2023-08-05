@@ -326,15 +326,16 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
             ++blockDepth;
             stackAddrs.push_back(stackAddrs.back());
             std::unordered_map<std::string_view, ASTIndex> innerScope = symbolTable;
-            VerifyExpression(stmt.ifstmt.cond, innerScope);
+            Type condType = VerifyExpression(stmt.ifstmt.cond, innerScope);
             
             size_t ifJmpIdx = instructions.size();
             AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP_Z});
+            instructions[ifJmpIdx].jmp.accessSize = condType.kind == TypeKind::U8 ? 1 : 8;
             VerifyStatements(stmt.ifstmt.body, innerScope);
 
             // If there is an else block, jump one more to skip the fi jump
             bool hasElse = stmt.ifstmt.elsestmt != AST_EMPTY;
-            instructions[ifJmpIdx].jmpAddr = instructions.size() + hasElse;
+            instructions[ifJmpIdx].jmp.jmpAddr = instructions.size() + hasElse;
 
             if (hasElse) {
                 size_t fiJmpIdx = instructions.size();
@@ -361,13 +362,15 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
             size_t cmpAddr = instructions.size();
 
             bool hasCondition = stmt.forstmt.cond != AST_NULL;
+            Type condType;
             if (hasCondition) {
-                VerifyExpression(stmt.forstmt.cond, innerScope);
+                condType = VerifyExpression(stmt.forstmt.cond, innerScope);
             }
             size_t whileJmpIdx = instructions.size();
 
             if (hasCondition) {
                 AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP_Z});
+                instructions[whileJmpIdx].jmp.accessSize = condType.kind == TypeKind::U8 ? 1 : 8;
             }
 
             VerifyStatements(stmt.forstmt.body, innerScope);
