@@ -7,7 +7,7 @@
 #include <functional>
 
 const char* TokenKindName(TokenKind kind) {
-    static_assert(static_cast<uint32_t>(TokenKind::TOKEN_COUNT) == 46, "Exhaustive check of token kinds failed");
+    static_assert(static_cast<uint32_t>(TokenKind::TOKEN_COUNT) == 47, "Exhaustive check of token kinds failed");
     const std::array<const char*, static_cast<uint32_t>(TokenKind::TOKEN_COUNT)> TokenKindNames{
         "NONE",
         "COMMENT",
@@ -25,6 +25,7 @@ const char* TokenKindName(TokenKind kind) {
         "RETURN",
         "BREAK",
         "CONTINUE",
+        "ASM",
         "U8",
         "I64",
         "F64",
@@ -391,6 +392,7 @@ bool Tokenizer::PollTokenWithComments() {
                 else if (curToken.text == "return")   curToken.kind = TokenKind::RETURN;
                 else if (curToken.text == "break")    curToken.kind = TokenKind::BREAK;
                 else if (curToken.text == "continue") curToken.kind = TokenKind::CONTINUE;
+                else if (curToken.text == "asm")      curToken.kind = TokenKind::ASM;
                 else                                  curToken.kind = TokenKind::IDENTIFIER;
             }
             else if (IsNumeric(curChar)) {

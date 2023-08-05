@@ -446,6 +446,12 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
             VerifyLValue(asgn.lvalue, symbolTable, false);
         } break;
 
+        case ASTKind::ASM_STATEMENT: {
+            for (ASTIndex stmtIdx : ast.lists[stmt.asm_.strings]) {
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::INLINE, .str=ast.tree[stmtIdx].literal.str});
+            }
+        } break;
+
         default: {
             // Treat everything else as expression
             VerifyExpression(stmtIdx, symbolTable);
@@ -568,7 +574,7 @@ void Analyzer::VerifyProgram() {
         }
         VerifyProcedure(procIdx);
         if (proc.procedure.isExtern) {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::CALL, .lit={.str={procName.text.data(), procName.text.size()}}});
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::CALL, .str={procName.text.data(), procName.text.size()}});
             keepGenerating = true;
         }
         procedures.back().insEndIdx = instructions.size();

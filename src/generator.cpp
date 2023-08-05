@@ -263,6 +263,13 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                 }
 
                 switch (ins.opcode) {
+                    case Instruction::Opcode::INLINE: {
+#if DBG_INS
+                        out.print("; INLINE ASM\n");
+#endif
+                        out.print("{}\n", std::string_view{ins.str.buf, ins.str.sz});
+                    } break;
+
                     case Instruction::Opcode::PUSH: {
 #if DBG_INS
                         if (ins.lit.kind == TypeKind::I64) out.print("; PUSH {}\n", ins.lit.i64);
@@ -568,7 +575,7 @@ void EmitInstructions(fmt::ostream& out, Target target, const std::vector<Proced
                     } break;
 
                     case Instruction::Opcode::CALL: {
-                        std::string_view sv{ins.lit.str.buf, ins.lit.str.sz};
+                        std::string_view sv{ins.str.buf, ins.str.sz};
 #if DBG_INS
                         out.print("; CALL EXTERN {}\n", sv);
 #endif

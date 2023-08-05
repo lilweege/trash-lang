@@ -17,6 +17,7 @@
 struct Instruction {
     enum class Opcode {
         // NOP,
+        INLINE,      // Inline asm
         PUSH,        // TOP = x
         LOAD_FAST,   // TOP = *x
         STORE,       // *TOP = TOP1
@@ -62,7 +63,8 @@ struct Instruction {
     };
 
     union {
-        Literal lit; // push, call (str lit)
+        ASTNode::StringView str; // call, inline
+        Literal lit; // push
         Access access; // load_fast, store_fast, alloca
         Operator op; // unaryop, binaryop
         uint64_t jmpAddr; // jmp, jz, jnz, save

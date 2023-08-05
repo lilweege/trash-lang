@@ -52,6 +52,7 @@ enum class ASTKind : uint8_t {
     RETURN_STATEMENT,
     CONTINUE_STATEMENT,
     BREAK_STATEMENT,
+    ASM_STATEMENT,
     DEFINITION,
     ASSIGN,
     NEG_UNARYOP_EXPR,
@@ -181,6 +182,9 @@ struct ASTNode {
         ASTIndex expr;
     };
 
+    struct ASTAsm {
+        ASTList strings;
+    };
 
     union {
         ASTProgram program;
@@ -195,6 +199,7 @@ struct ASTNode {
         ASTDefinition defn;
         ASTAssign asgn;
         ASTReturn ret;
+        ASTAsm asm_;
     };
 
     // String literal is making the struct big, so these aren't useful

@@ -24,6 +24,7 @@ enum class TokenKind : uint8_t {
     RETURN,
     BREAK,
     CONTINUE,
+    ASM,
     U8,
     I64,
     F64,

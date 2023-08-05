@@ -15,7 +15,7 @@ static bool ParseLiteral(std::string_view text, auto& out) {
 }
 
 const char* ASTKindName(ASTKind kind) {
-    static_assert(static_cast<uint32_t>(ASTKind::COUNT) == 31, "Exhaustive check of AST kinds failed");
+    static_assert(static_cast<uint32_t>(ASTKind::COUNT) == 32, "Exhaustive check of AST kinds failed");
     const std::array<const char*, static_cast<uint32_t>(ASTKind::COUNT)> ASTKindNames{
         "UNINITIALIZED",
         "PROGRAM",
@@ -25,6 +25,7 @@ const char* ASTKindName(ASTKind kind) {
         "RETURN_STATEMENT",
         "CONTINUE_STATEMENT",
         "BREAK_STATEMENT",
+        "ASM_STATEMENT",
         "DEFINITION",
         "ASSIGN",
         "NEG_UNARYOP_EXPR",
@@ -268,6 +269,12 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             PrintIndent(depth);
             PrintNode(rootIdx);
             fmt::print(stderr, "\n");
+        } break;
+        case ASTKind::ASM_STATEMENT: {
+            PrintIndent(depth);
+            PrintNode(rootIdx);
+            fmt::print(stderr, "\n");
+            PrintASTList(root.asm_.strings, depth + 1);
         } break;
 
         case ASTKind::UNINITIALIZED:
@@ -536,7 +543,7 @@ ASTIndex Parser::ParseFactor() {
     else if (tok.kind == TokenKind::STRING_LITERAL) {
         ++tokenIdx;
         ASTIndex lit = NewNodeFromLastToken(ASTKind::STRING_LITERAL_EXPR);
-        // TODO: new string with escaped characters
+        // TODO: Concatenated string literals
         ast.tree[lit].literal.str = { .buf = tok.text.data(), .sz = tok.text.size() };
         return lit;
     }
@@ -776,6 +783,29 @@ ASTIndex Parser::ParseStatement() {
         // FIXME: report error at the actual token
         ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after continue");
         return cont;
+    }
+    else if (tok.kind == TokenKind::ASM) {
+        ++tokenIdx;
+        ASTIndex asmKw = NewNodeFromLastToken(ASTKind::ASM_STATEMENT);
+        ASTList strings = NewASTList();
+        bool first = true;
+        while (true) {
+            const Token& strlit = PeekCurrentToken();
+            if (strlit.kind != TokenKind::STRING_LITERAL) {
+                if (first)
+                    CompileErrorAt(tok, "Expected at least one string literal after asm");
+                break;
+            }
+            first = false;
+            ++tokenIdx;
+            ASTIndex expr = NewNodeFromLastToken(ASTKind::STRING_LITERAL_EXPR);
+            ast.tree[expr].literal.str = { .buf = strlit.text.data(), .sz = strlit.text.size() };
+            AddToASTList(strings, expr);
+        }
+        ast.tree[asmKw].asm_.strings = strings;
+        // FIXME: report error at the actual token
+        ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after asm");
+        return asmKw;
     }
     // Maybe ambiguous here
     else if (tok.kind == TokenKind::IDENTIFIER) {
