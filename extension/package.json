@@ -3,7 +3,7 @@
 	"displayName": "Trash",
 	"description": "Extension for the trash-lang programming language",
 	"version": "1.0.0",
-	"publisher": "Luigi Quattrociocchi",
+	"publisher": "lilweege",
 	"engines": {
 		"vscode": "^1.28.0"
 	},
