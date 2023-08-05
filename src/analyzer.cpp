@@ -26,10 +26,16 @@ void Analyzer::VerifyDefinition(ASTIndex defnIdx, std::unordered_map<std::string
     std::string_view ident = token.text;
     const Token& asgnToken = tokens[ast.tree[defnIdx].tokenIdx + 1];
 
+    bool hasInitExpr = defn.initExpr != AST_NULL;
     bool isScalar = defn.arraySize == AST_NULL;
     size_t offset = symbolTable.size();
 
     if (!isScalar) {
+        bool oldKeepGenerating = keepGenerating;
+        if (hasInitExpr) {
+            // Don't allocate on stack if the array is initialied (elsewhere)
+            keepGenerating = false;
+        }
         Type arrSize = VerifyExpression(defn.arraySize, symbolTable);
         assert(arrSize.isScalar);
         if (arrSize.kind != TypeKind::I64) {
@@ -37,25 +43,34 @@ void Analyzer::VerifyDefinition(ASTIndex defnIdx, std::unordered_map<std::string
                 ident, TypeKindName(arrSize.kind));
         }
 
-        // Scale by the width of the array type (replace with a left shift when implemented)
-        if (defn.type == TypeKind::I64 || defn.type == TypeKind::F64) {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::I64,.i64=8}});
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::MUL_BINARYOP_EXPR}});
-        }
+        if (!hasInitExpr) {
+            // Scale by the width of the array type (replace with a left shift when implemented)
+            if (defn.type == TypeKind::I64 || defn.type == TypeKind::F64) {
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::I64,.i64=8}});
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::MUL_BINARYOP_EXPR}});
+            }
 
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::ALLOCA, .access={.varAddr=offset}});
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::ALLOCA, .access={.varAddr=offset}});
+        }
+        keepGenerating = oldKeepGenerating;
     }
 
-    if (defn.initExpr != AST_NULL) {
+    if (hasInitExpr) {
         Type rhsType = VerifyExpression(defn.initExpr, symbolTable);
-        assert(rhsType.isScalar);
-        if (!isScalar || defn.type != rhsType.kind) {
-            CompileErrorAt(asgnToken, "Incompatible types when initializing '{}' to type {} (expected {})",
-                ident, TypeKindName(rhsType.kind), TypeKindName(defn.type));
+        // assert(rhsType.isScalar);
+        if (defn.type != rhsType.kind) {
+            CompileErrorAt(asgnToken, "Incompatible types when initializing '{}' to type {}{} (expected {}{})",
+                           ident,
+                           TypeKindName(rhsType.kind),
+                           rhsType.isScalar ? "" : "[]",
+                           TypeKindName(defn.type),
+                           isScalar ? "" : "[]");
         }
-        size_t typeWidth = defn.type == TypeKind::U8 ? 1 : 8;
+        size_t typeWidth = !isScalar ? 8 :
+            defn.type == TypeKind::U8 ? 1 : 8;
         AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .access={.varAddr=offset,.accessSize=typeWidth}});
     }
+
 
     AssertIdentUnusedInCurrentScope(symbolTable, token);
 
@@ -179,12 +194,19 @@ Type Analyzer::VerifyCall(ASTIndex callIdx, std::unordered_map<std::string_view,
     for (size_t argIdx{}; argIdx < numArgs; ++argIdx) {
         const ASTNode::ASTDefinition& param = ast.tree[defn.paramTypes[argIdx]].defn;
         Type argType = VerifyExpression(args[argIdx], symbolTable);
-        if (param.type != argType.kind) {
+        bool isScalar = param.arraySize == AST_NULL;
+        if (param.type != argType.kind || isScalar != argType.isScalar) {
             const Token& argTok = tokens[ast.tree[args[argIdx]].tokenIdx];
-            CompileErrorAt(argTok, "Incompatible type {} for argument {} of '{}' (expected {})",
-                TypeKindName(argType.kind), argIdx+1, callTok.text, TypeKindName(param.type));
+            CompileErrorAt(argTok, "Incompatible type {}{} for argument {} of '{}' (expected {}{})",
+                           TypeKindName(argType.kind),
+                           argType.isScalar ? "" : "[]",
+                           argIdx+1,
+                           callTok.text,
+                           TypeKindName(param.type),
+                           isScalar ? "" : "[]");
         }
         // NOTE: Don't check sizes of arrays (decay to pointer)
+        // TODO: For types that are passed by reference (for now, only arrays), check constness
     }
 
     // Defer resolving this address until all procedures have been generated
@@ -194,8 +216,7 @@ Type Analyzer::VerifyCall(ASTIndex callIdx, std::unordered_map<std::string_view,
     // Set the return address to be the next instruction
     instructions[saveAddrIdx].jmpAddr = instructions.size();
 
-    // NOTE: The parser does not allow arrays as return types
-    return { defn.returnType, true };
+    return defn.returnType;
 }
 
 Type Analyzer::VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string_view, ASTIndex>& symbolTable) {
@@ -215,7 +236,7 @@ Type Analyzer::VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string
             return { TypeKind::U8, true };
         case ASTKind::STRING_LITERAL_EXPR:
             AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::STR,.str=expr.literal.str}});
-            return { TypeKind::STR, true };
+            return { TypeKind::STR, true }; // TODO: Assign string literal to u8[]
         case ASTKind::CALL_EXPR: {
             return VerifyCall(exprIdx, symbolTable);
         }
@@ -385,10 +406,13 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
             Type retType = hasReturnValue ?
                 VerifyExpression(stmt.ret.expr, symbolTable) :
                 Type{ TypeKind::NONE, true };
-            if (!retType.isScalar || retType.kind != currProc->returnType) {
+            if (!(retType.isScalar == currProc->returnType.isScalar && retType.kind == currProc->returnType.kind)) {
                 CompileErrorAt(tokens[ast.tree[stmtIdx].tokenIdx],
-                    "Incompatible return type {}, expected {}",
-                    TypeKindName(retType.kind), TypeKindName(currProc->returnType));
+                    "Incompatible return type {}{}, expected {}{}",
+                    TypeKindName(retType.kind),
+                    retType.isScalar ? "" : "[]",
+                    TypeKindName(currProc->returnType.kind),
+                    currProc->returnType.isScalar ? "" : "[]");
             }
             if (blockDepth == 0) {
                 returnAtTopLevel = true;
@@ -507,7 +531,7 @@ void Analyzer::VerifyProcedure(ASTIndex procIdx) {
             if (procedure.retType != TypeKind::NONE) {
                 CompileErrorAt(token, "Non-void procedure '{}' did not return in all control paths", token.text);
             }
-            bool hasReturnValue = procDefn.returnType != TypeKind::NONE;
+            bool hasReturnValue = procDefn.returnType.kind != TypeKind::NONE;
             AddInstruction(Instruction{.opcode=hasReturnValue ?
                 Instruction::Opcode::RETURN_VAL :
                 Instruction::Opcode::RETURN_VOID});
@@ -533,14 +557,14 @@ void Analyzer::VerifyProgram() {
     ast.tree.push_back({ .defn = { .type = TypeKind::STR }, .kind = ASTKind::DEFINITION, });
     ASTIndex strParam = ast.tree.size() - 1;
 
-    procedureDefns["sqrt"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = TypeKind::F64,  .instructionNum=BUILTIN_sqrt };
-    procedureDefns["puti"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = TypeKind::NONE, .instructionNum=BUILTIN_puti };
-    procedureDefns["putf"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = TypeKind::NONE, .instructionNum=BUILTIN_putf };
-    procedureDefns["puts"] = ProcedureDefn{ .paramTypes = { strParam }, .returnType = TypeKind::NONE, .instructionNum=BUILTIN_puts };
-    procedureDefns["itof"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = TypeKind::F64,  .instructionNum=BUILTIN_itof };
-    procedureDefns["ftoi"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = TypeKind::I64,  .instructionNum=BUILTIN_ftoi };
-    procedureDefns["itoc"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = TypeKind::U8,   .instructionNum=BUILTIN_itoc };
-    procedureDefns["ctoi"] = ProcedureDefn{ .paramTypes = { u8Param },  .returnType = TypeKind::I64,  .instructionNum=BUILTIN_ctoi };
+    procedureDefns["sqrt"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = { TypeKind::F64,  true }, .instructionNum=BUILTIN_sqrt };
+    procedureDefns["puti"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = { TypeKind::NONE, true }, .instructionNum=BUILTIN_puti };
+    procedureDefns["putf"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = { TypeKind::NONE, true }, .instructionNum=BUILTIN_putf };
+    procedureDefns["puts"] = ProcedureDefn{ .paramTypes = { strParam }, .returnType = { TypeKind::NONE, true }, .instructionNum=BUILTIN_puts };
+    procedureDefns["itof"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = { TypeKind::F64,  true }, .instructionNum=BUILTIN_itof };
+    procedureDefns["ftoi"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = { TypeKind::I64,  true }, .instructionNum=BUILTIN_ftoi };
+    procedureDefns["itoc"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = { TypeKind::U8,   true }, .instructionNum=BUILTIN_itoc };
+    procedureDefns["ctoi"] = ProcedureDefn{ .paramTypes = { u8Param },  .returnType = { TypeKind::I64,  true }, .instructionNum=BUILTIN_ctoi };
 
     // Collect all procedure definitions and "forward declare" them.
     // Mutual recursion should work out of the box
@@ -556,7 +580,7 @@ void Analyzer::VerifyProgram() {
         const auto& params = ast.lists[proc.procedure.params];
         procedureDefns[procName.text] = ProcedureDefn{
                 .paramTypes = params,
-                .returnType = proc.procedure.retType,
+                .returnType = { proc.procedure.retType, !proc.procedure.retIsArray },
             };
     }
 

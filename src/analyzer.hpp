@@ -21,7 +21,7 @@ struct Procedure {
 class Analyzer {
     struct ProcedureDefn {
         std::vector<ASTIndex> paramTypes;
-        TypeKind returnType; // Optional
+        Type returnType;
         size_t stackSpace;
         size_t instructionNum;
     };

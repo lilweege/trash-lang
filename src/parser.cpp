@@ -939,11 +939,12 @@ ASTIndex Parser::ParseProcedure() {
     if (arrowOrCurly.kind == TokenKind::ARROW) {
         ++tokenIdx;
         auto [retType, arrSize] = ParseType();
-        if (arrSize != AST_NULL) {
-            CompileErrorAt(arrowOrCurly, "Returning arrays is not allowed!");
-        }
+        // if (arrSize != AST_NULL) {
+        //     CompileErrorAt(arrowOrCurly, "Returning arrays is not allowed!");
+        // }
 
         ast.tree[proc].procedure.retType = retType;
+        ast.tree[proc].procedure.retIsArray = arrSize != AST_NULL;
     }
 
     ast.tree[proc].procedure.body = isExtern ? AST_EMPTY : ParseBody();

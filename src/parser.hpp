@@ -117,6 +117,7 @@ struct ASTNode {
         ASTList params;
         ASTList body;
         TypeKind retType;
+        bool retIsArray;
         bool isCdecl;
         bool isExtern;
         bool isPublic;
@@ -165,7 +166,7 @@ struct ASTNode {
 
     struct ASTDefinition {
         // Access ident through token
-        ASTIndex arraySize; // Should be integer literal
+        ASTIndex arraySize;
         ASTIndex initExpr; // Optional
         // These variables should move to flags but the other structs in the union are bigger anyways
         bool isConst; // let/mut
