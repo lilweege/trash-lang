@@ -6,47 +6,12 @@
 #include <vector>
 #include <stdint.h>
 
-// Language Grammar
-// TODO: bitwise operators, pointers, struct
-
-// Program             =  { Procedure }
-// Procedure           =  "proc" Identifier "(" [ VariableDefn { "," VariableDefn } ] ")" [ "->" Type ] Body
-
-// Body                =  Block | Statement
-// Block               =  "{" { Statement } "}"
-// Statement           =  IfStmt | ForStmt | ( VariableDefnAsgn | Assignment | Expression | "return" [ Expression ] | "break" | "continue" ) ";"
-
-// IfStmt              =  "if" "(" Expression ")" Body [ "else" Body ]
-// ForStmt             =  "for" "(" [ VariableDefnAsgn ] ";" [ Expression ] ";" [ Assignment ] ")" Body
-
-// Expression          =  LogicalTerm { "||" LogicalTerm }
-// LogicalTerm         =  LogicalFactor { "&&" LogicalFactor }
-// LogicalFactor       =  Comparison { ( "==" | "!=" ) Comparison }
-// Comparison          =  Sum { ( ">=" | "<=" | ">" | "<" ) Sum }
-// Sum                 =  Term { ( "+" | "-" ) Term }
-// Term                =  Factor { ( "*" | "/" | "%" ) Factor }
-// Factor              =  IntegerLiteral | FloatLiteral | StringLiteral | CharacterLiteral | ProcedureCall | LValue | "(" Expression ")" | "-" Factor | "!" Factor
-// ProcedureCall       =  Identifier "(" [ Expression { "," Expression } ] ")"
-
-// Assignment          =  LValue "=" Expression
-// VariableDefnAsgn    =  VariableDefn [ "=" Expression ]
-// VariableDefn        =  ( "let" | "mut" ) Type Identifier
-// Type                =  Primitive [ Subscript ]
-// LValue              =  Identifier [ Subscript ]
-// Subscript           =  "[" Expression "]"
-// Primitive           =  "u8" | "i64" | "f64"
-
-// Technically not EBNF...
-// LineComment      =  ? ...
-// IntegerLiteral   =  [0-9]+
-// FloatLiteral     =  IntegerLiteral . IntegerLiteral
-// StringLiteral    =  " { AsciiOrEscapeChar } "
-// CharacterLiteral =  ' AsciiOrEscapeChar '
-
 enum class ASTKind : uint8_t {
     UNINITIALIZED,
     PROGRAM,
     PROCEDURE,
+    STRUCT,
+    TYPE,
     IF_STATEMENT,
     FOR_STATEMENT,
     RETURN_STATEMENT,
@@ -82,17 +47,6 @@ enum class ASTKind : uint8_t {
 };
 const char* ASTKindName(ASTKind kind);
 
-enum class TypeKind : uint8_t {
-    NONE, // void functions
-    U8,
-    I64,
-    F64,
-    STR,
-    // ...
-    COUNT
-};
-const char* TypeKindName(TypeKind kind);
-
 // TODO: strong types
 using TokenIndex = uint32_t;
 using ASTIndex = uint32_t;
@@ -111,13 +65,18 @@ struct ASTNode {
 
     struct ASTProgram {
         ASTList procedures;
+        ASTList structs;
+    };
+
+    struct ASTType {
+        // Access ident through token
+        uint32_t numPointerLevels; // @
     };
 
     struct ASTProcedure {
         ASTList params;
         ASTList body;
-        TypeKind retType;
-        bool retIsArray;
+        ASTIndex retType_; // TypeKind retType;
         bool isCdecl;
         bool isExtern;
         bool isPublic;
@@ -143,11 +102,13 @@ struct ASTNode {
 
     struct ASTLValue {
         // Access ident through token
-        ASTIndex subscript; // Optional
+        ASTList subscripts;
+        ASTIndex member; // Optional
     };
 
     struct ASTCall {
         // Access proc name through token
+        ASTList targs;
         ASTList args;
     };
 
@@ -166,11 +127,9 @@ struct ASTNode {
 
     struct ASTDefinition {
         // Access ident through token
-        ASTIndex arraySize;
         ASTIndex initExpr; // Optional
-        // These variables should move to flags but the other structs in the union are bigger anyways
+        ASTIndex type;
         bool isConst; // let/mut
-        TypeKind type;
     };
 
     struct ASTAssign {
@@ -187,8 +146,13 @@ struct ASTNode {
         ASTList strings;
     };
 
+    struct ASTStruct {
+        ASTList members;
+    };
+
     union {
         ASTProgram program;
+        ASTType type;
         ASTProcedure procedure;
         ASTBinaryOperator binaryOp;
         ASTUnaryOperator unaryOp;
@@ -201,6 +165,7 @@ struct ASTNode {
         ASTAssign asgn;
         ASTReturn ret;
         ASTAsm asm_;
+        ASTStruct struct_;
     };
 
     // String literal is making the struct big, so these aren't useful
@@ -234,7 +199,7 @@ class Parser {
     ASTList NewASTList();
     void AddToASTList(ASTList list, ASTIndex idx);
     ASTIndex ParseSubscript();
-    std::pair<TypeKind, ASTIndex> ParseType();
+    ASTIndex ParseType();
     ASTIndex ParseVarDefn();
     ASTIndex ParseVarDefnAsgn();
     ASTIndex ParseIf();
@@ -252,6 +217,7 @@ class Parser {
     ASTIndex ParseStatement();
     ASTList ParseBody();
     ASTIndex ParseProcedure();
+    ASTIndex ParseStruct();
     void ParseProgram();
 
 

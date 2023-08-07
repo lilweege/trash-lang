@@ -15,11 +15,13 @@ static bool ParseLiteral(std::string_view text, auto& out) {
 }
 
 const char* ASTKindName(ASTKind kind) {
-    static_assert(static_cast<uint32_t>(ASTKind::COUNT) == 32, "Exhaustive check of AST kinds failed");
+    static_assert(static_cast<uint32_t>(ASTKind::COUNT) == 34, "Exhaustive check of AST kinds failed");
     const std::array<const char*, static_cast<uint32_t>(ASTKind::COUNT)> ASTKindNames{
         "UNINITIALIZED",
         "PROGRAM",
         "PROCEDURE",
+        "STRUCT",
+        "TYPE",
         "IF_STATEMENT",
         "FOR_STATEMENT",
         "RETURN_STATEMENT",
@@ -53,17 +55,22 @@ const char* ASTKindName(ASTKind kind) {
     return ASTKindNames[static_cast<uint32_t>(kind)];
 }
 
-const char* TypeKindName(TypeKind kind) {
-    static_assert(static_cast<uint32_t>(TypeKind::COUNT) == 5, "Exhaustive check of type kinds failed");
-    const std::array<const char*, static_cast<uint32_t>(TypeKind::COUNT)> TypeKindNames{
-        "void",
-        "u8",
-        "i64",
-        "f64",
-        "str",
-    };
-    return TypeKindNames[static_cast<uint32_t>(kind)];
-}
+// const char* TypeKindName(TypeKind kind) {
+//     static_assert(static_cast<uint32_t>(TypeKind::COUNT) == 6, "Exhaustive check of type kinds failed");
+//     if (kind == TypeKind::STRUCT) {
+//         assert(0);
+//         return "struct";
+//     }
+//     const std::array<const char*, static_cast<uint32_t>(TypeKind::COUNT)> TypeKindNames{
+//         "void",
+//         "struct",
+//         "u8",
+//         "i64",
+//         "f64",
+//         "str",
+//     };
+//     return TypeKindNames[static_cast<uint32_t>(kind)];
+// }
 
 #define CompileErrorAt(token, format, ...) CompileErrorAtToken(file, token, format, __VA_ARGS__)
 #define ExpectAndConsumeToken(expectedKind, format, ...) do { \
@@ -112,8 +119,7 @@ void Parser::AddToASTList(ASTList list, ASTIndex idx) {
 }
 
 static void PrintIndent(uint32_t depth) {
-    for (uint32_t i = 0; i < depth; ++i)
-        fmt::print(stderr, "    ");
+    fmt::print(stderr, "{:>{}}", "", depth*2);
 }
 
 void Parser::PrintNode(ASTIndex rootIdx) const {
@@ -127,14 +133,17 @@ void Parser::PrintNode(ASTIndex rootIdx) const {
 // TODO: make freestanding or make templated fmt::formatter
 void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
     auto PrintASTList = [&](ASTList body, uint32_t newDepth) {
-        for (ASTIndex childIdx : ast.lists[body])
-            PrintAST(childIdx, newDepth);
+        if (body != AST_EMPTY) {
+            for (ASTIndex childIdx : ast.lists[body])
+                PrintAST(childIdx, newDepth);
+        }
     };
 
     const ASTNode& root = ast.tree[rootIdx];
 
     switch (root.kind) {
         case ASTKind::PROGRAM: {
+            PrintASTList(root.program.structs, depth);
             PrintASTList(root.program.procedures, depth);
         } break;
         case ASTKind::PROCEDURE: {
@@ -144,7 +153,8 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             fmt::print(stderr, "\n");
             PrintASTList(root.procedure.params, depth + 1);
             PrintIndent(depth + 1);
-            fmt::print(stderr, "-> {}\n\n", TypeKindName(root.procedure.retType));
+            PrintAST(root.procedure.retType_);
+            fmt::print(stderr, "\n");
             PrintASTList(root.procedure.body, depth + 1);
         } break;
         case ASTKind::IF_STATEMENT: {
@@ -182,16 +192,10 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
         case ASTKind::DEFINITION: {
             PrintIndent(depth);
             PrintNode(rootIdx);
-            fmt::print(stderr, " ({} {}",
-                (root.defn.isConst ? "let" : "mut"),
-                TypeKindName(root.defn.type));
-            if (root.defn.arraySize != AST_NULL) {
-                fmt::print(stderr, "[]");
-            }
-            fmt::print(stderr, " {})\n", tokens[root.tokenIdx].text);
-            if (root.defn.arraySize != AST_NULL) {
-                PrintAST(root.defn.arraySize, depth + 1);
-            }
+            fmt::print(stderr, " ({} {})\n",
+                root.defn.isConst ? "let" : "mut",
+                tokens[root.tokenIdx].text);
+            PrintAST(root.defn.type, depth + 1);
             if (root.defn.initExpr != AST_NULL) {
                 PrintAST(root.defn.initExpr, depth + 1);
             }
@@ -249,22 +253,38 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             PrintNode(rootIdx);
             fmt::print(stderr, " ({})\n", std::string_view{root.literal.str.buf, root.literal.str.sz});
         } break;
+        case ASTKind::TYPE: {
+            PrintIndent(depth);
+            PrintNode(rootIdx);
+            fmt::print(stderr, " ({}{:@>{}})\n",
+                       tokens[root.tokenIdx].text,
+                       "", root.type.numPointerLevels);
+        } break;
         case ASTKind::LVALUE_EXPR: {
             PrintIndent(depth);
             PrintNode(rootIdx);
-            if (root.lvalue.subscript != AST_NULL) {
-                fmt::print(stderr, "[]\n");
-                PrintAST(root.lvalue.subscript, depth + 1);
-            }
-            else {
+            bool newline = true;
+            if (root.lvalue.subscripts != AST_EMPTY) {
                 fmt::print(stderr, "\n");
+                newline = false;
+                PrintASTList(root.lvalue.subscripts, depth + 1);
             }
+            if (root.lvalue.member != AST_NULL) {
+                if (newline)
+                    fmt::print(stderr, "\n");
+                newline = false;
+                PrintAST(root.lvalue.member, depth + 1);
+            }
+            if (newline) fmt::print(stderr, "\n");
         } break;
         case ASTKind::CALL_EXPR: {
             PrintIndent(depth);
             PrintNode(rootIdx);
             fmt::print(stderr, "\n");
-            PrintASTList(root.call.args, depth + 1);
+            if (root.call.targs != AST_EMPTY)
+                PrintASTList(root.call.targs, depth + 1);
+            if (root.call.args != AST_EMPTY)
+                PrintASTList(root.call.args, depth + 1);
         } break;
         case ASTKind::CONTINUE_STATEMENT:
         case ASTKind::BREAK_STATEMENT: {
@@ -278,44 +298,35 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             fmt::print(stderr, "\n");
             PrintASTList(root.asm_.strings, depth + 1);
         } break;
+        case ASTKind::STRUCT: {
+            PrintIndent(depth);
+            PrintNode(rootIdx);
+            fmt::print(stderr, "\n");
+            PrintASTList(root.struct_.members, depth + 1);
+        } break;
 
         case ASTKind::UNINITIALIZED:
         case ASTKind::COUNT: assert(0); break;
     }
 }
 
-
-ASTIndex Parser::ParseSubscript() {
-    const Token& lsquare = PeekCurrentToken();
-    if (lsquare.kind != TokenKind::LSQUARE)
-        return AST_NULL;
-    
-    // It is a subscript
-    ++tokenIdx;
-    ASTIndex subscript = ParseExpression();
-    if (subscript == AST_NULL)
-        CompileErrorAt(lsquare, "Invalid subscript, expected expression after \"[\"");
-    if (PollCurrentToken().kind != TokenKind::RSQUARE)
-        CompileErrorAt(lsquare, "Unmatched square bracket");
-    
-    return subscript;
-}
-
-std::pair<TypeKind, ASTIndex> Parser::ParseType() {
+ASTIndex Parser::ParseType() {
     const Token& typeTok = PeekCurrentToken();
-    if (!(typeTok.kind == TokenKind::I64 || typeTok.kind == TokenKind::F64 || typeTok.kind == TokenKind::U8))
-        return { TypeKind::NONE, AST_NULL };
+    if (typeTok.kind != TokenKind::IDENTIFIER)
+        return AST_NULL;
 
-    // It is a type
+    // It is a type (ident unchecked)
     ++tokenIdx;
+    ASTIndex type = NewNodeFromLastToken(ASTKind::TYPE);
 
-    ASTIndex arrSize = ParseSubscript();
-    switch (typeTok.kind) {
-        case TokenKind::I64: return { TypeKind::I64, arrSize };
-        case TokenKind::F64: return { TypeKind::F64, arrSize };
-        case TokenKind::U8:  return { TypeKind::U8 , arrSize };
-        default: assert(0 && "Unreachable"); return {};
+    while (true) {
+        const Token& at = PeekCurrentToken();
+        if (at.kind != TokenKind::AT)
+            break;
+        ++tokenIdx;
+        ++ast.tree[type].type.numPointerLevels;
     }
+    return type;
 }
 
 ASTIndex Parser::ParseVarDefn() {
@@ -326,10 +337,7 @@ ASTIndex Parser::ParseVarDefn() {
     // It is a variable definition
     ++tokenIdx;
 
-    auto [type, arrSize] = ParseType();
-    if (type == TypeKind::NONE)
-        CompileErrorAt(letOrMut,
-            "Invalid variable declaration, expected type after \"let\"/\"mut\"");
+    ASTIndex type = ParseType();
 
     ExpectAndConsumeToken(TokenKind::IDENTIFIER,
         "Invalid variable declaration, expected identifier after type");
@@ -337,7 +345,6 @@ ASTIndex Parser::ParseVarDefn() {
     ASTIndex defn = NewNodeFromLastToken(ASTKind::DEFINITION);
     ast.tree[defn].defn.isConst = letOrMut.kind == TokenKind::LET;
     ast.tree[defn].defn.type = type;
-    ast.tree[defn].defn.arraySize = arrSize;
 
     return defn;
 }
@@ -398,15 +405,39 @@ ASTIndex Parser::ParseCall() {
         return AST_NULL;
     
     ++tokenIdx;
-    const Token& lparen = PeekCurrentToken();
-    if (lparen.kind != TokenKind::LPAREN) {
+    const Token& afterIdent = PeekCurrentToken();
+    if (afterIdent.kind != TokenKind::LPAREN &&
+        afterIdent.kind != TokenKind::COLON)
+    {
         tokenIdx = oldTokenIdx;
         return AST_NULL;
     }
 
     // It is a procedure call
-    ++tokenIdx;
     ASTIndex call = NewNodeFromToken(oldTokenIdx, ASTKind::CALL_EXPR);
+    ASTList templateArgs = AST_EMPTY;
+
+    if (afterIdent.kind == TokenKind::COLON) {
+        while (true) {
+            const Token& colon = PeekCurrentToken();
+            if (colon.kind == TokenKind::LPAREN)
+                break;
+            if (colon.kind != TokenKind::COLON)
+                CompileErrorAt(colon,
+                    "Unexpected token, excpected colon separated type list");
+            ++tokenIdx;
+            ASTIndex type = ParseType();
+            if (type == AST_NULL)
+                CompileErrorAt(colon, "Expected type after colon in template parameter list");
+
+            if (templateArgs == AST_EMPTY)
+                templateArgs = ast.tree[call].call.targs = NewASTList();
+            AddToASTList(templateArgs, type);
+        }
+    }
+
+    // Current token is LPAREN
+    ++tokenIdx;
 
     const Token& nextTok = PeekCurrentToken();
     if (nextTok.kind == TokenKind::RPAREN) {
@@ -443,13 +474,40 @@ ASTIndex Parser::ParseLValue() {
     const Token& id = PeekCurrentToken();
     if (id.kind != TokenKind::IDENTIFIER)
         return AST_NULL;
-    
+
     // It is an LValue
     ++tokenIdx;
 
     ASTIndex lvalue = NewNodeFromLastToken(ASTKind::LVALUE_EXPR);
-    ast.tree[lvalue].lvalue.subscript = ParseSubscript();
+    ASTList subscripts = AST_EMPTY;
+    while (true) {
+        const Token& lsquare = PeekCurrentToken();
+        if (lsquare.kind != TokenKind::LSQUARE)
+            break;
+        if (subscripts == AST_EMPTY)
+            subscripts = ast.tree[lvalue].lvalue.subscripts = NewASTList();
 
+        // It is a subscript
+        ++tokenIdx;
+        ASTIndex subscript = ParseExpression();
+        if (subscript == AST_NULL)
+            CompileErrorAt(lsquare, "Invalid subscript, expected expression after \"[\"");
+        if (PollCurrentToken().kind != TokenKind::RSQUARE)
+            CompileErrorAt(lsquare, "Unmatched square bracket");
+
+        AddToASTList(subscripts, subscript);
+    }
+
+    // Parse struct member access
+    const Token& dot = PeekCurrentToken();
+    if (dot.kind == TokenKind::OPERATOR_DOT) {
+        ++tokenIdx;
+        ASTIndex member = ParseLValue();
+        if (member == AST_NULL) {
+            CompileErrorAt(dot, "Expected identifier after \".\"");
+        }
+        ast.tree[lvalue].lvalue.member = member;
+    }
     return lvalue;
 }
 
@@ -940,13 +998,7 @@ ASTIndex Parser::ParseProcedure() {
     const Token& arrowOrCurly = PeekCurrentToken();
     if (arrowOrCurly.kind == TokenKind::ARROW) {
         ++tokenIdx;
-        auto [retType, arrSize] = ParseType();
-        // if (arrSize != AST_NULL) {
-        //     CompileErrorAt(arrowOrCurly, "Returning arrays is not allowed!");
-        // }
-
-        ast.tree[proc].procedure.retType = retType;
-        ast.tree[proc].procedure.retIsArray = arrSize != AST_NULL;
+        ast.tree[proc].procedure.retType_ = ParseType();
     }
 
     ast.tree[proc].procedure.body = isExtern ? AST_EMPTY : ParseBody();
@@ -954,14 +1006,53 @@ ASTIndex Parser::ParseProcedure() {
     return proc;
 }
 
-void Parser::ParseProgram() {
-    ASTIndex allProcs = NewASTList();
-    while (tokenIdx < tokens.size()) {
-        ASTIndex proc = ParseProcedure();
-        assert(proc != AST_NULL);
-        AddToASTList(allProcs, proc);
+ASTIndex Parser::ParseStruct() {
+    ExpectAndConsumeToken(TokenKind::STRUCT,
+        "Invalid top level declaration, expected \"struct\"");
+    ExpectAndConsumeToken(TokenKind::IDENTIFIER,
+        "Expected identifier after \"struct\"");
+    ASTIndex struct_ = NewNodeFromLastToken(ASTKind::STRUCT);
+    ExpectAndConsumeToken(TokenKind::LCURLY,
+        "Expected curly brace after struct name");
+    ASTList members = AST_EMPTY;
+    while (true) {
+        const Token& curly = PeekCurrentToken();
+        if (curly.kind == TokenKind::RCURLY) {
+            ++tokenIdx;
+            break;
+        }
+        ASTIndex member = ParseVarDefn();
+        if (member == AST_NULL)
+            CompileErrorAt(PeekCurrentToken(),
+                "Unexpected token, excpected semicolon separated member list");
+
+        if (members == AST_EMPTY)
+            members = ast.tree[struct_].struct_.members = NewASTList();
+        AddToASTList(members, member);
+        ExpectAndConsumeToken(TokenKind::SEMICOLON, "Expected semicolon after variable definition");
     }
-    ast.tree[0].program.procedures = allProcs;
+    return struct_;
+}
+
+void Parser::ParseProgram() {
+    ASTIndex allProcs = ast.tree[0].program.procedures = NewASTList();
+    ASTIndex allStructs = ast.tree[0].program.structs = NewASTList();
+    while (tokenIdx < tokens.size()) {
+        const Token& topLevel = PeekCurrentToken();
+        if (topLevel.kind == TokenKind::PROC) {
+            ASTIndex proc = ParseProcedure();
+            assert(proc != AST_NULL);
+            AddToASTList(allProcs, proc);
+        }
+        else if (topLevel.kind == TokenKind::STRUCT) {
+            ASTIndex struct_ = ParseStruct();
+            assert(struct_ != AST_NULL);
+            AddToASTList(allStructs, struct_);
+        }
+        else {
+            CompileErrorAt(topLevel, "Invalid top level declaration, expected \"struct\" or \"proc\"");
+        }
+    }
 }
 
 void Parser::ParseEntireProgram() {
@@ -981,6 +1072,6 @@ AST ParseEntireProgram(const std::vector<Token>& tokens) {
     AST ast;
     Parser parser{tokens, ast};
     parser.ParseEntireProgram();
-    // parser.PrintAST();
+    parser.PrintAST();
     return ast;
 }

@@ -29,10 +29,11 @@
 		"procedure": {
 			"patterns": [
 				{
-					"match": "([[a-zA-Z]_]\\w*)\\s*\\((.*)",
+					"match": "([[a-zA-Z]_]\\w*)((?::[\\w@]*)*)\\s*\\((.*)",
 					"captures": {
 						"1": { "name": "entity.name.function" },
-						"2": { "patterns": [{ "include": "#evaluate" }] }
+						"2": { "patterns": [{ "include": "#evaluate" }] },
+						"3": { "patterns": [{ "include": "#evaluate" }] }
 					}
 				}
 			]
@@ -41,7 +42,7 @@
 			"patterns": [
 				{
 					"name": "keyword.operator",
-					"match": "&&|\\|\\||\\+|-|\\*|/|%|>|<|>=|<=|==|!="
+					"match": ":|#|@|&&|\\|\\||\\+|-|\\*|/|%|>|<|>=|<=|==|!="
 				},
 				{
 					"name": "keyword.assign",
@@ -49,7 +50,7 @@
 				},
 				{
 					"name": "keyword.control.flow",
-					"match": "->|proc|extern|cdecl|public|if|else|for|continue|break|return"
+					"match": "->|proc|extern|cdecl|public|if|else|for|struct|continue|break|return"
 				}
 			]
 		},

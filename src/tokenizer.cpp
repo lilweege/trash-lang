@@ -7,15 +7,17 @@
 #include <functional>
 
 const char* TokenKindName(TokenKind kind) {
-    static_assert(static_cast<uint32_t>(TokenKind::TOKEN_COUNT) == 47, "Exhaustive check of token kinds failed");
+    static_assert(static_cast<uint32_t>(TokenKind::TOKEN_COUNT) == 48, "Exhaustive check of token kinds failed");
     const std::array<const char*, static_cast<uint32_t>(TokenKind::TOKEN_COUNT)> TokenKindNames{
         "NONE",
         "COMMENT",
+        "COLON",
         "SEMICOLON",
         "IDENTIFIER",
         "IF",
         "ELSE",
         "FOR",
+        "STRUCT",
         "PROC",
         "CDECL",
         "EXTERN",
@@ -26,9 +28,6 @@ const char* TokenKindName(TokenKind kind) {
         "BREAK",
         "CONTINUE",
         "ASM",
-        "U8",
-        "I64",
-        "F64",
         "OPERATOR_POS",
         "OPERATOR_NEG",
         "OPERATOR_MUL",
@@ -36,6 +35,7 @@ const char* TokenKindName(TokenKind kind) {
         "OPERATOR_MOD",
         "OPERATOR_COMMA",
         "OPERATOR_ASSIGN",
+        "OPERATOR_DOT",
         "OPERATOR_EQ",
         "OPERATOR_NE",
         "OPERATOR_GE",
@@ -52,6 +52,7 @@ const char* TokenKindName(TokenKind kind) {
         "LSQUARE",
         "RSQUARE",
         "ARROW",
+        "AT",
         "INTEGER_LITERAL",
         "FLOAT_LITERAL",
         "STRING_LITERAL",
@@ -233,6 +234,21 @@ bool Tokenizer::PollTokenWithComments() {
             curToken.text = LeftChop(file.source, curPos.idx, 1);
         } break;
 
+        case '@': {
+            curToken.kind = TokenKind::AT;
+            curToken.text = LeftChop(file.source, curPos.idx, 1);
+        } break;
+
+        case ':': {
+            curToken.kind = TokenKind::COLON;
+            curToken.text = LeftChop(file.source, curPos.idx, 1);
+        } break;
+
+        case '.': {
+            curToken.kind = TokenKind::OPERATOR_DOT;
+            curToken.text = LeftChop(file.source, curPos.idx, 1);
+        } break;
+
         case '=': {
             if (curPos.idx + 1 < file.source.size() &&
                 file.source[curPos.idx + 1] == '=')
@@ -366,9 +382,7 @@ bool Tokenizer::PollTokenWithComments() {
         } break;
 
         case '\\': return TokenUnimplemnted("\\");
-        case '.': return TokenUnimplemnted(".");
         case '^': return TokenUnimplemnted("^");
-        // TODO: pointers
 
         default: {
             auto IsIdentifier = [](char c) { return (isalnum(c) != 0) || c == '_'; };
@@ -380,9 +394,7 @@ bool Tokenizer::PollTokenWithComments() {
                 if      (curToken.text == "if")       curToken.kind = TokenKind::IF;
                 else if (curToken.text == "else")     curToken.kind = TokenKind::ELSE;
                 else if (curToken.text == "for")      curToken.kind = TokenKind::FOR;
-                else if (curToken.text == "u8")       curToken.kind = TokenKind::U8;
-                else if (curToken.text == "i64")      curToken.kind = TokenKind::I64;
-                else if (curToken.text == "f64")      curToken.kind = TokenKind::F64;
+                else if (curToken.text == "struct")   curToken.kind = TokenKind::STRUCT;
                 else if (curToken.text == "proc")     curToken.kind = TokenKind::PROC;
                 else if (curToken.text == "cdecl")    curToken.kind = TokenKind::CDECL;
                 else if (curToken.text == "extern")   curToken.kind = TokenKind::EXTERN;
