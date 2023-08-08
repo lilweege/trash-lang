@@ -6,8 +6,8 @@
 #include <unordered_map>
 
 struct Type {
-    TypeKind kind;
-    bool isScalar;
+    std::string_view typeName; //TypeKind kind;
+    uint32_t numPointerLevels; // bool isScalar;
 };
 
 struct Procedure {
@@ -19,8 +19,23 @@ struct Procedure {
 };
 
 class Analyzer {
+    struct TypeDefn {
+        enum class StorageKind {
+            U8,  // Pass by value (general register)
+            I64, // Pass by value (general register)
+            F32, // Pass by value (wide register)
+            F64, // Pass by value (wide register)
+            STRUCT, // Pass by pointer (general register)
+        };
+
+        std::vector<std::pair<Type, size_t>> memberOffsets;
+        size_t size;
+        size_t alignment;
+        StorageKind storageKind;
+    };
+
     struct ProcedureDefn {
-        std::vector<ASTIndex> paramTypes;
+        std::vector<Type> paramTypes;
         Type returnType;
         size_t stackSpace;
         size_t instructionNum;
@@ -29,15 +44,14 @@ class Analyzer {
     const std::vector<Token>& tokens;
     AST& ast;
     std::unordered_map<std::string_view, ProcedureDefn> procedureDefns;
+    std::unordered_map<std::string_view, TypeDefn> resolvedTypes;
     std::vector<std::pair<size_t, std::string_view>> unresolvedCalls;
 
     ProcedureDefn* currProc;
-    // int entryAddr;
     int loopDepth{};
     int blockDepth{};
-    // bool hasEntry{};
     bool returnAtTopLevel;
-    size_t maxNumVariables;
+    size_t maxStaticStackSize; // size_t maxNumVariables;
     std::vector<std::vector<size_t>> breakAddrs;
     std::vector<std::vector<size_t>> continueAddrs;
     std::vector<std::unordered_map<std::string_view, size_t>> stackAddrs;

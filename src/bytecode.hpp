@@ -8,11 +8,22 @@
 #define BUILTIN_puti ((size_t)(-2))
 #define BUILTIN_putf ((size_t)(-3))
 #define BUILTIN_puts ((size_t)(-4))
-#define BUILTIN_itof ((size_t)(-5))
-#define BUILTIN_ftoi ((size_t)(-6))
-#define BUILTIN_itoc ((size_t)(-7))
-#define BUILTIN_ctoi ((size_t)(-8))
 #define IS_BUILTIN(x) ((int64_t)(x) < 0)
+
+enum class LiteralKind {
+    U8,
+    I64,
+    F64,
+    STR,
+    // ...
+    COUNT,
+};
+
+enum class OperandKind {
+    U8,
+    I64, // Includes pointers
+    F64,
+};
 
 struct Instruction {
     enum class Opcode {
@@ -22,7 +33,7 @@ struct Instruction {
         LOAD_FAST,   // TOP = *x
         STORE,       // *TOP = TOP1
         STORE_FAST,  // *x = TOP
-        ALLOCA,      // *x = alloca(TOP)
+        // ALLOCA,      // *x = alloca(TOP)
         DEREF,       // TOP = *TOP
         UNARY_OP,    // TOP = u(x, TOP)
         BINARY_OP,   // TOP = b(x, TOP1, TOP)
@@ -37,7 +48,7 @@ struct Instruction {
     } opcode;
 
     struct Literal {
-        TypeKind kind;
+        LiteralKind kind_;
         union {
             uint64_t i64;
             double f64;
@@ -47,7 +58,8 @@ struct Instruction {
     };
 
     struct Operator {
-        TypeKind kind;
+        // TypeKind kind;
+        OperandKind kind_;
         ASTKind op_kind;
     };
 

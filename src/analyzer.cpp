@@ -4,6 +4,7 @@
 
 #include <cassert>
 
+#if 0
 void Analyzer::AddInstruction(Instruction ins) {
     if (keepGenerating)
         instructions.push_back(ins);
@@ -552,30 +553,209 @@ void Analyzer::VerifyProcedure(ASTIndex procIdx) {
     stackAddrs.pop_back();
 }
 
+#endif
+
+
+class GraphUtil {
+    const std::vector<std::vector<uint32_t>>& adj;
+    const size_t N;
+    std::vector<bool> vis;
+    std::vector<bool> stk;
+    std::vector<uint32_t> order;
+
+    bool HasCycle(uint32_t u) {
+        if (!vis[u]) {
+            vis[u] = true;
+            stk[u] = true;
+            for (uint32_t v : adj[u]) {
+                if (!vis[v])
+                    if (HasCycle(v))
+                        return true;
+                if (stk[v])
+                    return true;
+            }
+            stk[u] = false;
+        }
+        return false;
+    }
+
+    void TopologicalSort(uint32_t u) {
+        vis[u] = true;
+        for (uint32_t v : adj[u])
+            if (!vis[v])
+                TopologicalSort(v);
+        order.push_back(u);
+    }
+
+public:
+    GraphUtil(const std::vector<std::vector<uint32_t>>& adj_)
+        : adj{adj_}, N{adj_.size()}, vis(adj_.size()), stk(adj_.size())
+    {}
+
+    uint32_t HasCycle() {
+        std::fill(vis.begin(), vis.end(), false);
+        std::fill(stk.begin(), stk.end(), false);
+        for (uint32_t i = 0; i < N; ++i)
+            if (HasCycle(i)) return i;
+        return adj.size();
+    }
+
+    std::vector<uint32_t> TopologicalSort() {
+        order.clear();
+        order.reserve(N);
+        std::fill(vis.begin(), vis.end(), false);
+        for (uint32_t i = 0; i < N; ++i)
+            if (!vis[i]) TopologicalSort(i);
+        return order;
+    }
+};
+
+static int64_t RoudUpToPowerOfTwo(int64_t x, int64_t pow) {
+    assert(pow && ((pow & (pow - 1)) == 0));
+    return (x + pow - 1) & -pow;
+}
+
 void Analyzer::VerifyProgram() {
 
-    // Builtins
-    ast.tree.push_back({ .defn = { .type = TypeKind::F64 }, .kind = ASTKind::DEFINITION, });
-    ASTIndex f64Param = ast.tree.size() - 1;
-    ast.tree.push_back({ .defn = { .type = TypeKind::I64 }, .kind = ASTKind::DEFINITION, });
-    ASTIndex i64Param = ast.tree.size() - 1;
-    ast.tree.push_back({ .defn = { .type = TypeKind::U8 }, .kind = ASTKind::DEFINITION, });
-    ASTIndex u8Param = ast.tree.size() - 1;
-    ast.tree.push_back({ .defn = { .type = TypeKind::STR }, .kind = ASTKind::DEFINITION, });
-    ASTIndex strParam = ast.tree.size() - 1;
+    const ASTNode& prog = ast.tree[0];
 
-    procedureDefns["sqrt"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = { TypeKind::F64,  true }, .instructionNum=BUILTIN_sqrt };
-    procedureDefns["puti"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = { TypeKind::NONE, true }, .instructionNum=BUILTIN_puti };
-    procedureDefns["putf"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = { TypeKind::NONE, true }, .instructionNum=BUILTIN_putf };
-    procedureDefns["puts"] = ProcedureDefn{ .paramTypes = { strParam }, .returnType = { TypeKind::NONE, true }, .instructionNum=BUILTIN_puts };
-    procedureDefns["itof"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = { TypeKind::F64,  true }, .instructionNum=BUILTIN_itof };
-    procedureDefns["ftoi"] = ProcedureDefn{ .paramTypes = { f64Param }, .returnType = { TypeKind::I64,  true }, .instructionNum=BUILTIN_ftoi };
-    procedureDefns["itoc"] = ProcedureDefn{ .paramTypes = { i64Param }, .returnType = { TypeKind::U8,   true }, .instructionNum=BUILTIN_itoc };
-    procedureDefns["ctoi"] = ProcedureDefn{ .paramTypes = { u8Param },  .returnType = { TypeKind::I64,  true }, .instructionNum=BUILTIN_ctoi };
+    // Resolve all type definitions
+    const auto& structList = ast.lists[prog.program.structs];
+    std::unordered_map<std::string_view, uint32_t> structIds;
+    structIds["u8"]  = structList.size()+0; resolvedTypes["u8"]  = { .size=1, .alignment=1, .storageKind=TypeDefn::StorageKind::U8 };
+    structIds["i64"] = structList.size()+1; resolvedTypes["i64"] = { .size=8, .alignment=8, .storageKind=TypeDefn::StorageKind::I64 };
+    // structIds["f32"] = structList.size()+2; resolvedTypes["f32"] = { .size=4, .alignment=4, .storageKind=TypeDefn::StorageKind::F32 };
+    structIds["f64"] = structList.size()+3; resolvedTypes["f64"] = { .size=8, .alignment=8, .storageKind=TypeDefn::StorageKind::F64 };
+    uint32_t numBuiltinTypes = structIds.size();
+
+    for (size_t i = 0; i < structList.size(); ++i) {
+        ASTIndex structIdx = structList[i];
+        const ASTNode& st = ast.tree[structIdx];
+        const Token& structName = tokens[st.tokenIdx];
+        if (structIds.contains(structName.text))
+            CompileErrorAt(structName,
+                           "Redeclaration of type \"{}\"",
+                           structName.text);
+        structIds[structName.text] = i;
+    }
+
+    uint32_t N = structIds.size();
+    std::vector<std::vector<uint32_t>> depAdjList(N);
+
+    for (ASTIndex structIdx : structList) {
+        const ASTNode& st = ast.tree[structIdx];
+        const Token& structName = tokens[st.tokenIdx];
+
+        ASTList members = st.struct_.members;
+        uint32_t structId = structIds.at(structName.text);
+        std::vector<uint32_t>& dependOn = depAdjList[structId];
+
+        if (ast.lists[members].empty()) {
+            CompileErrorAt(structName, "Struct cannot be empty");
+        }
+
+        for (ASTIndex memberIdx : ast.lists[members]) {
+            const ASTNode& memberType = ast.tree[ast.tree[memberIdx].defn.type];
+            const Token& memberName = tokens[memberType.tokenIdx];
+
+            auto it = structIds.find(memberName.text);
+            if (it == structIds.end()) {
+                CompileErrorAt(memberName, "Unknown type \"{}\"", memberName.text);
+            }
+            uint32_t memberId = it->second;
+
+            bool isPointer = memberType.type.numPointerLevels != 0;
+            if (!isPointer) {
+                dependOn.push_back(memberId);
+            }
+        }
+    }
+
+    // Detect cycle in graph
+    GraphUtil graph{depAdjList};
+    uint32_t cycleStartId = graph.HasCycle();
+
+    if (cycleStartId != N) {
+        ASTIndex structIdx = structList[cycleStartId];
+        const ASTNode& st = ast.tree[structIdx];
+        const Token& structName = tokens[st.tokenIdx];
+        CompileErrorAt(structName, "Cyclic struct definition in \"{}\" detected!", structName.text);
+    }
+
+    // Resolve types
+    std::vector<uint32_t> postorder = graph.TopologicalSort();
+    for (uint32_t i : postorder) {
+        // Skip builtins
+        if (i >= structList.size()) continue;
+
+        ASTIndex structIdx = structList[i];
+        const ASTNode& st = ast.tree[structIdx];
+        const Token& structName = tokens[st.tokenIdx];
+        fmt::print(stderr, "{}\n", structName.text);
+
+        ASTList members = st.struct_.members;
+
+        TypeDefn& type = resolvedTypes[structName.text];
+        type.storageKind = TypeDefn::StorageKind::STRUCT;
+        for (ASTIndex memberIdx : ast.lists[members]) {
+            const ASTNode& memberType = ast.tree[ast.tree[memberIdx].defn.type];
+            const Token& memberName = tokens[memberType.tokenIdx];
+
+            bool isPointer = memberType.type.numPointerLevels != 0;
+            size_t memberSize;
+            size_t memberAlignment;
+            if (isPointer) {
+                memberSize = 8;
+                memberAlignment = 8;
+            }
+            else {
+                // fmt::print(stderr, "    {}\n", memberName.text);
+                auto it = resolvedTypes.find(memberName.text);
+                assert(it != resolvedTypes.end());
+
+                memberSize = it->second.size;
+                memberAlignment = it->second.alignment;
+            }
+
+            // Round up to align
+            type.size = RoudUpToPowerOfTwo(type.size + memberSize, memberAlignment);
+
+            type.memberOffsets.emplace_back(Type{
+                .typeName = memberName.text,
+                .numPointerLevels = memberType.type.numPointerLevels,
+            }, type.size - memberSize);
+
+            if (type.alignment < memberAlignment)
+                type.alignment = memberAlignment;
+        }
+
+        type.size = RoudUpToPowerOfTwo(type.size, type.alignment);
+
+        // for (auto& [k,v] : type.memberOffsets) {
+        //     fmt::print(stderr, "  {}{:@>{}} - {}\n",
+        //                k.typeName,
+        //                "", k.numPointerLevels,
+        //                v);
+        // }
+        // fmt::print(stderr, "size={}\n", type.size);
+        // fmt::print(stderr, "align={}\n", type.alignment);
+    }
+
+    return;
+
+    // Builtins
+    // procedureDefns["as"]
+    // procedureDefns["alloca"]
+    // procedureDefns["numof"]
+    // procedureDefns["sqrt"]
+    // procedureDefns["puti"]
+    // procedureDefns["putf"]
+    // procedureDefns["puts"]
+    // procedureDefns["putcs"]
+    // procedureDefns["putc"]
 
     // Collect all procedure definitions and "forward declare" them.
     // Mutual recursion should work out of the box
-    const ASTNode& prog = ast.tree[0];
     const auto& procList = ast.lists[prog.program.procedures];
     for (ASTIndex procIdx : procList) {
         const ASTNode& proc = ast.tree[procIdx];
@@ -584,10 +764,10 @@ void Analyzer::VerifyProgram() {
             CompileErrorAt(procName, "Redefinition of procedure '{}'", procName.text);
         }
 
-        const auto& params = ast.lists[proc.procedure.params];
+        const std::vector<ASTIndex>& params = ast.lists[proc.procedure.params];
         procedureDefns[procName.text] = ProcedureDefn{
-                .paramTypes = params,
-                .returnType = { proc.procedure.retType, !proc.procedure.retIsArray },
+                // .paramTypes = params,
+                // .returnType = { proc.procedure.retType, !proc.procedure.retIsArray },
             };
     }
 

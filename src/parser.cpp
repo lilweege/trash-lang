@@ -55,23 +55,6 @@ const char* ASTKindName(ASTKind kind) {
     return ASTKindNames[static_cast<uint32_t>(kind)];
 }
 
-// const char* TypeKindName(TypeKind kind) {
-//     static_assert(static_cast<uint32_t>(TypeKind::COUNT) == 6, "Exhaustive check of type kinds failed");
-//     if (kind == TypeKind::STRUCT) {
-//         assert(0);
-//         return "struct";
-//     }
-//     const std::array<const char*, static_cast<uint32_t>(TypeKind::COUNT)> TypeKindNames{
-//         "void",
-//         "struct",
-//         "u8",
-//         "i64",
-//         "f64",
-//         "str",
-//     };
-//     return TypeKindNames[static_cast<uint32_t>(kind)];
-// }
-
 #define CompileErrorAt(token, format, ...) CompileErrorAtToken(file, token, format, __VA_ARGS__)
 #define ExpectAndConsumeToken(expectedKind, format, ...) do { \
         const Token& tok_ = PollCurrentToken(); \
