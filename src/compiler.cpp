@@ -3,7 +3,6 @@
 #include "analyzer.hpp"
 #include "tokenizer.hpp"
 #include "parser.hpp"
-#include "interpreter.hpp"
 #include "generator.hpp"
 
 #include <fstream>
@@ -113,7 +112,7 @@ void CompilerMain(int argc, char** argv) {
     std::vector<Procedure> procedures = VerifyAST(tokens, ast);
 
     if (options.binFn.empty()) {
-        InterpretInstructions(procedures);
+        assert(0);
     }
     else {
         fmt::ostream binFile = fmt::output_file(options.binFn);
