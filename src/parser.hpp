@@ -22,6 +22,7 @@ enum class ASTKind : uint8_t {
     ASSIGN,
     NEG_UNARYOP_EXPR,
     NOT_UNARYOP_EXPR,
+    TRUNC_UNARYOP, // Internal
     EQ_BINARYOP_EXPR,
     NE_BINARYOP_EXPR,
     GE_BINARYOP_EXPR,

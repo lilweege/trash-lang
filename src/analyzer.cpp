@@ -4,7 +4,58 @@
 
 #include <cassert>
 
-#if 0
+static bool IsPrimitiveType(Type type) {
+    return type.typeName == "u8" || type.typeName == "i64" || type.typeName == "f64";
+}
+
+static bool IsIntegralType(Type type) {
+    return type.typeName == "u8" || type.typeName == "i64";
+}
+
+static AccessKind TypeAccessKind(Type type) {
+    bool isScalar = type.numPointerLevels == 0;
+    bool isIntegral = IsIntegralType(type);
+    return (isScalar || isIntegral) ? AccessKind::INTEGRAL : AccessKind::FLOATING;
+}
+
+static void AssertTypesAreSame(Type lhs, Type rhs, const Token& token) {
+    if (lhs != rhs) {
+        CompileErrorAt(token,
+            "Incorrect type {}{:@>{}}, expected {}{:@>{}}",
+            lhs.typeName, "", lhs.numPointerLevels,
+            rhs.typeName, "", rhs.numPointerLevels);
+    }
+}
+
+static int64_t RoudUpToPowerOfTwo(int64_t x, int64_t pow) {
+    assert(pow && ((pow & (pow - 1)) == 0));
+    return (x + pow - 1) & -pow;
+}
+
+Type Analyzer::VerifyType(ASTIndex typeIdx) {
+    assert(typeIdx != AST_NULL);
+    const ASTNode& type = ast.tree[typeIdx];
+    const Token& typeName = tokens[type.tokenIdx];
+    if (!resolvedTypes.contains(typeName.text))
+        CompileErrorAt(typeName, "Unknown type \"{}\"", typeName.text);
+    return Type{
+        .typeName = typeName.text,
+        .numPointerLevels = type.type.numPointerLevels,
+    };
+}
+
+uint32_t Analyzer::TypeSize(Type type) {
+    assert(resolvedTypes.contains(type.typeName));
+    if (type.numPointerLevels != 0) return 8;
+    return resolvedTypes[type.typeName].size;
+}
+
+uint32_t Analyzer::TypeAlign(Type type) {
+    assert(resolvedTypes.contains(type.typeName));
+    if (type.numPointerLevels != 0) return 8;
+    return resolvedTypes[type.typeName].alignment;
+}
+
 void Analyzer::AddInstruction(Instruction ins) {
     if (keepGenerating)
         instructions.push_back(ins);
@@ -28,124 +79,158 @@ void Analyzer::VerifyDefinition(ASTIndex defnIdx, std::unordered_map<std::string
     const Token& asgnToken = tokens[ast.tree[defnIdx].tokenIdx + 1];
 
     bool hasInitExpr = defn.initExpr != AST_NULL;
-    bool isScalar = defn.arraySize == AST_NULL;
-    size_t offset = symbolTable.size();
+    Type lhs = VerifyType(defn.type);
 
-    if (!isScalar) {
-        bool oldKeepGenerating = keepGenerating;
-        if (hasInitExpr) {
-            // Don't allocate on stack if the array is initialied (elsewhere)
-            keepGenerating = false;
-        }
-        Type arrSize = VerifyExpression(defn.arraySize, symbolTable);
-        assert(arrSize.isScalar);
-        if (arrSize.kind != TypeKind::I64) {
-            CompileErrorAt(asgnToken, "Size of array '{}' has non-integer type (got {})",
-                ident, TypeKindName(arrSize.kind));
-        }
-
-        if (!hasInitExpr) {
-            // Scale by the width of the array type (replace with a left shift when implemented)
-            if (defn.type == TypeKind::I64 || defn.type == TypeKind::F64) {
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::I64,.i64=8}});
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::MUL_BINARYOP_EXPR}});
-            }
-
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::ALLOCA, .access={.varAddr=offset}});
-        }
-        keepGenerating = oldKeepGenerating;
-    }
+    size_t currStackSize = RoudUpToPowerOfTwo(blockStackSize.back(), TypeAlign(lhs));
+    size_t offset = currStackSize;
+    size_t typeSize = TypeSize(lhs);
+    currStackSize += typeSize;
 
     if (hasInitExpr) {
-        Type rhsType = VerifyExpression(defn.initExpr, symbolTable);
-        if (defn.type != rhsType.kind) {
-            CompileErrorAt(asgnToken, "Incompatible types when initializing '{}' to type {}{} (expected {}{})",
-                           ident,
-                           TypeKindName(rhsType.kind),
-                           rhsType.isScalar ? "" : "[]",
-                           TypeKindName(defn.type),
-                           isScalar ? "" : "[]");
-        }
-        size_t typeWidth = !isScalar ? 8 :
-            defn.type == TypeKind::U8 ? 1 : 8;
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .access={.varAddr=offset,.accessSize=typeWidth}});
+        Type rhs = VerifyExpression(defn.initExpr, symbolTable);
+        AssertTypesAreSame(lhs, rhs, asgnToken);
+        size_t accessSize = typeSize;
+        assert(IsPrimitiveType(lhs) || lhs.numPointerLevels != 0);
+        assert(typeSize <= 8);
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .fastAccess={.varAddr=offset,.accessSize=accessSize}});
     }
-
 
     AssertIdentUnusedInCurrentScope(symbolTable, token);
 
     stackAddrs.back()[ident] = offset;
     symbolTable[ident] = defnIdx;
-
-    if (maxNumVariables < offset + 1)
-        maxNumVariables = offset + 1;
+    blockStackSize.back() = currStackSize;
+    if (maxStaticStackSize < currStackSize)
+        maxStaticStackSize = currStackSize;
 }
 
+#if 0
 Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_view, ASTIndex>& symbolTable, bool isLoading) {
-    const ASTNode& expr = ast.tree[lvalIdx];
-    const Token& token = tokens[expr.tokenIdx];
+    assert(lvalIdx != AST_NULL);
 
+    const Token& token = tokens[ast.tree[lvalIdx].tokenIdx];
     if (!symbolTable.contains(token.text)) {
         CompileErrorAt(token, "Use of undefined identifier '{}'", token.text);
     }
-    const ASTNode::ASTDefinition& defn = ast.tree[symbolTable[token.text]].defn;
-    bool isScalar = defn.arraySize == AST_NULL;
-    bool hasSubscript = expr.lvalue.subscript != AST_NULL;
-    size_t typeWidth = defn.type == TypeKind::U8 ? 1 : 8;
 
-    // FIXME: Non-scalar expressions are entirely disallowed
-    // Maybe change this when strings need to work correctly
-    if (isScalar) {
-        if (hasSubscript) {
-            CompileErrorAt(token, "Cannot subscript scalar variable '{}'", token.text);
-        }
-
-        if (isLoading) {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=typeWidth}});
-        }
-        else {
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=typeWidth}});
-        }
-    }
-    else {
-        if (!hasSubscript) {
-            if (isLoading) {
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
-            }
-            else {
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
-            }
-        }
-        else {
-            // Push (i * w + a) where a is the array (pointer) and i is the subscript
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD_FAST, .access={.varAddr=stackAddrs.back().at(token.text),.accessSize=8}});
-
-            Type subType = VerifyExpression(expr.lvalue.subscript, symbolTable);
-            if (!subType.isScalar || subType.kind != TypeKind::I64) {
-                CompileErrorAt(tokens[ast.tree[expr.lvalue.subscript].tokenIdx],
-                    "Cannot subscript with non-scalar integral variable '{}'",
-                    token.text);
-            }
-
-            // Scale by the width of the array type (replace with a left shift when implemented)
-            if (defn.type == TypeKind::I64 || defn.type == TypeKind::F64) {
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::I64,.i64=8}});
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::MUL_BINARYOP_EXPR}});
-            }
-
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=TypeKind::I64,.op_kind=ASTKind::ADD_BINARYOP_EXPR}});
-
-            if (isLoading) {
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::DEREF, .access={.accessSize=typeWidth}});
-            }
-            else {
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::STORE, .access={.accessSize=typeWidth}});
-            }
-        }
+    // load/store fast if possible
+    const ASTNode& expr = ast.tree[lvalIdx];
+    bool hasSubscripts = expr.lvalue.subscripts != AST_EMPTY;
+    bool hasMember = expr.lvalue.member != AST_NULL;
+    if (!hasSubscripts && !hasMember) {
+        ASTIndex defnIdx = symbolTable.at(tokens[expr.tokenIdx].text);
+        Instruction::Opcode loadOrStore = isLoading ? Instruction::Opcode::LOAD_FAST : Instruction::Opcode::STORE_FAST;
+        size_t varAddr = stackAddrs.back().at(token.text);
+        Type varType = VerifyType(ast.tree[defnIdx].defn.type);
+        size_t typeSize = TypeSize(varType);
+        assert(IsPrimitiveType(varType) || varType.numPointerLevels != 0);
+        assert(typeSize <= 8);
+        AddInstruction(Instruction{.opcode=loadOrStore, .fastAccess={.varAddr=varAddr,.accessSize=typeSize}});
+        return varType;
     }
 
-    return { defn.type, isScalar || hasSubscript };
+    Instruction::Opcode loadOrStore = isLoading ? Instruction::Opcode::LOAD : Instruction::Opcode::STORE;
+    // Evaluate left to right in loop:
+    //   Subscripts chain (assert number of pointer levels) - each subscript loads with offset
+    //   Member (assert name when accessing) - change base access offset
+
+    ASTIndex memberIdx = lvalIdx;
+    while (true) {
+        const ASTNode& expr = ast.tree[memberIdx];
+        const Token& exprToken = tokens[expr.tokenIdx];
+        ASTIndex defnIdx = symbolTable.at(exprToken.text);
+        Type varType = VerifyType(ast.tree[defnIdx].defn.type);
+
+        bool hasSubscripts = expr.lvalue.subscripts != AST_EMPTY;
+        bool hasMember = memberIdx != AST_NULL;
+        // bool finalAccess = !hasSubscripts && !hasMember;
+        // if (finalAccess) {
+        //     // AddInstruction(Instruction{.opcode=loadOrStore, .access={.accessSize=,.offset=0,.hasSubscript=false}});
+        //     break;
+        // }
+
+        // arr[x].bar[y].foo[a][b][c].baz = z
+        //                                z
+        // load_fast arr                  z arr
+        // load_fast x                    z arr x
+        // load_fast offset(bar)          z arr x offset(bar)
+        // load TOP2+TOP1*size(bar*)+TOP  z &arr[x].bar
+        // load_fast y                    z &arr[x] y
+        // load_fast offset(foo)          z &arr[x] y offset(foo)
+        // load TOP2+TOP1*size(bar)+TOP   z &arr[x][y].foo
+        // load_fast a                    z &arr[x][y].foo a
+        // load TOP1+TOP*size(foo**)      z &arr[x][y].foo[a]
+        // load_fast b                    z &arr[x][y].foo[a] b
+        // load TOP1+TOP*size(foo*)       z &arr[x][y].foo[a][b]
+        // load_fast c                    z &arr[x][y].foo[a][b] c
+        // load_fast offset(baz)          z &arr[x][y].foo[a][b] c offset(baz)
+        // store TOP2+TOP1*size(foo)+TOP, TOP3
+
+        // AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD, .access={.accessSize=8,.offset=0,.hasSubscript=true}});
+        uint32_t numPointerLevels = varType.numPointerLevels;
+        if (hasSubscripts) {
+            const std::vector<ASTIndex>& subscripts = ast.lists[expr.lvalue.subscripts];
+            for (ASTIndex subscript : subscripts) {
+                Type subscriptType = VerifyExpression(subscript, symbolTable);
+                if (subscriptType.numPointerLevels != 0 || !IsIntegralType(subscriptType)) {
+                    CompileErrorAt(tokens[ast.tree[subscript].tokenIdx],
+                        "Cannot subscript with non-scalar integral expression",
+                        token.text);
+                }
+
+                if (numPointerLevels == 0) {
+                    CompileErrorAt(tokens[ast.tree[subscript].tokenIdx],
+                        "Cannot take subscript of scalar variable");
+                }
+                --numPointerLevels;
+
+                // The last deref should account for member offset if applicable, wait until later
+                if (numPointerLevels != 0) {
+                    AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD, .access={.accessSize=8,.offset=0,.hasSubscript=true}});
+                }
+            }
+        }
+
+        const TypeDefn& typeDefn = resolvedTypes.at(exprToken.text);
+        if (hasMember) {
+            const ASTNode& member = ast.tree[expr.lvalue.member];
+            const Token& memberName = tokens[member.tokenIdx];
+
+            if (numPointerLevels != 0) {
+                CompileErrorAt(memberName,
+                    "Cannot access member of non-scalar type {}{:@>{}}",
+                    varType.typeName, "", numPointerLevels);
+            }
+
+            // FIXME: Looping over all members is potentially slow for structs with many memebrs
+            bool ok = false;
+            size_t memberOffset;
+            for (auto& [type, offset] : typeDefn.memberOffsets) {
+                if (type.typeName == memberName.text) {
+                    ok = true;
+                    memberOffset = offset;
+                    break;
+                }
+            }
+
+            if (!ok) {
+                CompileErrorAt(memberName, "Use of undefined member '{}' of struct '{}'",
+                    memberName.text, tokens[expr.tokenIdx].text);
+            }
+
+            // AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD, .access={.accessSize=typeDefn.size,.offset=memberOffset,.hasSubscript=hasSubscripts}});
+            memberIdx = member.lvalue.member;
+        }
+        else {
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::LOAD, .access={.accessSize=typeDefn.size,.offset=0,.hasSubscript=hasSubscripts}});
+        }
+    }
+
+    // return { defn.type, isScalar || hasSubscript };
+    assert(0);
+    return {};
 }
+#endif
 
 
 // x = add(1, 2);
@@ -172,55 +257,131 @@ Type Analyzer::VerifyLValue(ASTIndex lvalIdx, std::unordered_map<std::string_vie
 Type Analyzer::VerifyCall(ASTIndex callIdx, std::unordered_map<std::string_view, ASTIndex>& symbolTable) {
     const Token& callTok = tokens[ast.tree[callIdx].tokenIdx];
     const ASTNode::ASTCall& call = ast.tree[callIdx].call;
-    const auto& args = ast.lists[call.args];
+    const std::vector<ASTIndex>& args = ast.lists[call.args];
+    const std::vector<ASTIndex>& targs = ast.lists[call.targs];
     size_t numArgs = args.size();
+    size_t numTArgs = targs.size();
 
-
-    // Push the address of the instruction following the jump
-    size_t saveAddrIdx = instructions.size();
-    AddInstruction(Instruction{.opcode=Instruction::Opcode::SAVE});
-
-    if (!procedureDefns.contains(callTok.text)) {
-        CompileErrorAt(callTok, "Call to undefined procedure '{}'", callTok.text);
-    }
-
-    const ProcedureDefn& defn = procedureDefns.at(callTok.text);
-    size_t numParams = defn.paramTypes.size();
-    if (numArgs != numParams) {
-        if (numParams == 1) {
-            CompileErrorAt(callTok, "Expected {} argument, got {} instead", numParams, numArgs);
+    auto AssertCorrectNumberOfTemplateArguments = [&](size_t numTParams) {
+        if (numTArgs != numTParams) {
+            if (numTParams == 1) {
+                CompileErrorAt(callTok, "Expected {} template argument, got {} instead", numTParams, numTArgs);
+            }
+            else {
+                CompileErrorAt(callTok, "Expected {} template arguments, got {} instead", numTParams, numTArgs);
+            }
         }
-        else {
-            CompileErrorAt(callTok, "Expected {} arguments, got {} instead", numParams, numArgs);
-        }
-    }
+    };
 
-    for (size_t argIdx{}; argIdx < numArgs; ++argIdx) {
-        const ASTNode::ASTDefinition& param = ast.tree[defn.paramTypes[argIdx]].defn;
+    auto AssertCorrectNumberOfArguments = [&](size_t numParams) {
+        if (numArgs != numParams) {
+            if (numParams == 1) {
+                CompileErrorAt(callTok, "Expected {} argument, got {} instead", numParams, numArgs);
+            }
+            else {
+                CompileErrorAt(callTok, "Expected {} arguments, got {} instead", numParams, numArgs);
+            }
+        }
+    };
+
+    auto AssertArgumentHasType = [&](size_t argIdx, Type paramType) {
         Type argType = VerifyExpression(args[argIdx], symbolTable);
-        bool isScalar = param.arraySize == AST_NULL;
-        if (param.type != argType.kind || isScalar != argType.isScalar) {
+        if (argType != paramType) {
             const Token& argTok = tokens[ast.tree[args[argIdx]].tokenIdx];
-            CompileErrorAt(argTok, "Incompatible type {}{} for argument {} of '{}' (expected {}{})",
-                           TypeKindName(argType.kind),
-                           argType.isScalar ? "" : "[]",
+            CompileErrorAt(argTok, "Incompatible type {}{:@>{}} for argument {} of '{}' (expected {}{:@>{}})",
+                           argType.typeName, "", argType.numPointerLevels,
                            argIdx+1,
                            callTok.text,
-                           TypeKindName(param.type),
-                           isScalar ? "" : "[]");
+                           paramType.typeName, "", paramType.numPointerLevels);
         }
-        // NOTE: Don't check sizes of arrays (decay to pointer)
-        // TODO: For types that are passed by reference (for now, only arrays), check constness
+    };
+
+    // Handle builtins
+    if (callTok.text == "as" || callTok.text == "alloca" || callTok.text == "numof") {
+        if (callTok.text == "alloca") {
+            AssertCorrectNumberOfArguments(1);
+            AssertCorrectNumberOfTemplateArguments(1);
+            Type templateType = VerifyType(targs[0]);
+            uint32_t typeSize = TypeSize(templateType);
+            // Scale by the width of the array type (replace with a left shift when implemented)
+            AssertArgumentHasType(0, templateType);
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::ALLOCA, .multiplier=typeSize});
+            // Alloca for pointer is allowed
+            return { templateType.typeName, templateType.numPointerLevels+1 };
+        }
+        else if (callTok.text == "as") {
+            AssertCorrectNumberOfArguments(1);
+            AssertCorrectNumberOfTemplateArguments(1);
+            Type argType = VerifyExpression(args[0], symbolTable);
+            Type templateType = VerifyType(targs[0]);
+
+            // Allowed casts:
+            //   - integral to integral
+            //   - float to float
+            //   - pointer to pointer
+            //   - integral to pointer
+            bool argTypeIsScalar = argType.numPointerLevels == 0;
+            bool templateTypeIsScalar = templateType.numPointerLevels == 0;
+            bool argTypeIsIntegral = IsIntegralType(argType);
+            bool templateTypeIsIntegral = IsIntegralType(templateType);
+            if ((argTypeIsIntegral || !argTypeIsScalar) != (templateTypeIsIntegral || !templateTypeIsScalar)) {
+                const Token& argTok = tokens[ast.tree[args[0]].tokenIdx];
+                CompileErrorAt(argTok, "Incompatible type {}{:@>{}} for template argument {}{:@>{}}) of '{}'",
+                               argType.typeName, "", argType.numPointerLevels,
+                               templateType.typeName, "", templateType.numPointerLevels,
+                               callTok.text);
+            }
+
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::UNARY_OP, .op={.op_kind=ASTKind::TRUNC_UNARYOP,.accessKind=TypeAccessKind(templateType)}});
+            return templateType;
+        }
+        else {
+            AssertCorrectNumberOfArguments(1);
+            AssertCorrectNumberOfTemplateArguments(1);
+            Type templateType = VerifyType(targs[0]);
+            uint32_t typeSize = TypeSize(templateType);
+
+            AssertArgumentHasType(0, Type{"i64", 0});
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind_=LiteralKind::I64,.i64=typeSize}});
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.op_kind=ASTKind::MUL_BINARYOP_EXPR,.accessKind=AccessKind::INTEGRAL}});
+
+            return { "i64", 0 };
+        }
     }
+    else {
+        // TODO: Constructors
+        if (resolvedTypes.contains(callTok.text)) {
+            assert(0);
+        }
 
-    // Defer resolving this address until all procedures have been generated
-    unresolvedCalls.emplace_back(instructions.size(), callTok.text);
-    AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP});
+        // Push the address of the instruction following the jump
+        size_t saveAddrIdx = instructions.size();
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::SAVE});
 
-    // Set the return address to be the next instruction
-    instructions[saveAddrIdx].jmpAddr = instructions.size();
+        if (!procedureDefns.contains(callTok.text)) {
+            CompileErrorAt(callTok, "Call to undefined procedure '{}'", callTok.text);
+        }
 
-    return defn.returnType;
+        const ProcedureDefn& defn = procedureDefns.at(callTok.text);
+        size_t numParams = defn.paramTypes.size();
+        AssertCorrectNumberOfArguments(numParams);
+        AssertCorrectNumberOfTemplateArguments(0); // TODO: Allow user defined templates
+
+        for (size_t argIdx{}; argIdx < numArgs; ++argIdx) {
+            Type paramType = defn.paramTypes[argIdx];
+            AssertArgumentHasType(argIdx, paramType);
+            // TODO: For types that are passed by reference (for now, only arrays), check constness
+        }
+
+        // Defer resolving this address until all procedures have been generated
+        unresolvedCalls.emplace_back(instructions.size(), callTok.text);
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP});
+
+        // Set the return address to be the next instruction
+        instructions[saveAddrIdx].jmpAddr = instructions.size();
+
+        return defn.returnType;
+    }
 }
 
 Type Analyzer::VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string_view, ASTIndex>& symbolTable) {
@@ -229,48 +390,48 @@ Type Analyzer::VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string
     switch (expr.kind) {
         case ASTKind::LVALUE_EXPR:
             return VerifyLValue(exprIdx, symbolTable, true);
-        case ASTKind::INTEGER_LITERAL_EXPR:
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::I64,.i64=expr.literal.i64}});
-            return { TypeKind::I64, true };
-        case ASTKind::FLOAT_LITERAL_EXPR:
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::F64,.f64=expr.literal.f64}});
-            return { TypeKind::F64, true };
-        case ASTKind::CHAR_LITERAL_EXPR:
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::U8,.u8=expr.literal.u8}});
-            return { TypeKind::U8, true };
-        case ASTKind::STRING_LITERAL_EXPR:
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind=TypeKind::STR,.str=expr.literal.str}});
-            return { TypeKind::STR, true }; // TODO: Assign string literal to u8[]
-        case ASTKind::CALL_EXPR: {
+        case ASTKind::CALL_EXPR:
             return VerifyCall(exprIdx, symbolTable);
-        }
+        case ASTKind::INTEGER_LITERAL_EXPR:
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind_=LiteralKind::I64,.i64=expr.literal.i64}});
+            return { "i64", 0 };
+        case ASTKind::FLOAT_LITERAL_EXPR:
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind_=LiteralKind::F64,.f64=expr.literal.f64}});
+            return { "f64", 0 };
+        case ASTKind::CHAR_LITERAL_EXPR:
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind_=LiteralKind::U8,.u8=expr.literal.u8}});
+            return { "u8", 0 };
+        case ASTKind::STRING_LITERAL_EXPR:
+            AddInstruction(Instruction{.opcode=Instruction::Opcode::PUSH, .lit={.kind_=LiteralKind::STR,.str=expr.literal.str}});
+            return { .typeName="u8", .numPointerLevels=1 };
         default: break;
     }
 
     // Otherwise, expect a binary or unary operator
     const Token& token = tokens[expr.tokenIdx];
+    // Unary
     if (expr.kind == ASTKind::NEG_UNARYOP_EXPR ||
         expr.kind == ASTKind::NOT_UNARYOP_EXPR)
     {
         Type exprType = VerifyExpression(expr.unaryOp.expr, symbolTable);
-        if (!exprType.isScalar) {
-            CompileErrorAt(token, "Could not apply unary operator to non-scalar type");
+        bool isScalar = exprType.numPointerLevels == 0;
+
+        if (!isScalar) {
+            CompileErrorAt(token, "Cannot apply unary operator to non-scalar type {}{:@>{}}",
+                exprType.typeName, "", exprType.numPointerLevels);
         }
-        if (expr.kind == ASTKind::NEG_UNARYOP_EXPR) {
-            if (!(exprType.kind == TypeKind::I64 || exprType.kind == TypeKind::U8 || exprType.kind == TypeKind::F64)) {
-                CompileErrorAt(token, "Cannot negate non-numeric type {}", TypeKindName(exprType.kind));
-            }
+        if (!IsPrimitiveType(exprType)) {
+            CompileErrorAt(token, "Cannot apply unary operator to non-primitive type {}", exprType.typeName);
         }
-        else {
-            if (!(exprType.kind == TypeKind::I64 || exprType.kind == TypeKind::U8)) {
-                CompileErrorAt(token, "Cannot complement of non-integral type {}", TypeKindName(exprType.kind));
-            }
+        if (expr.kind == ASTKind::NOT_UNARYOP_EXPR && !IsIntegralType(exprType)) {
+            CompileErrorAt(token, "Cannot complement non-integral type {}", exprType.typeName);
         }
 
-        AddInstruction(Instruction{.opcode=Instruction::Opcode::UNARY_OP, .op={.kind=exprType.kind,.op_kind=expr.kind}});
-        return exprType;
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::UNARY_OP, .op={.op_kind=expr.kind, .accessKind=TypeAccessKind(exprType)}});
+        return exprType; // Result is same type
     }
 
+    // Binary
     bool isLogical =
         expr.kind == ASTKind::EQ_BINARYOP_EXPR ||
         expr.kind == ASTKind::NE_BINARYOP_EXPR || 
@@ -289,38 +450,49 @@ Type Analyzer::VerifyExpression(ASTIndex exprIdx, std::unordered_map<std::string
         expr.kind == ASTKind::MOD_BINARYOP_EXPR;
 
     if (isLogical || isArithmetic) {
-        Type lhsExprType = VerifyExpression(expr.binaryOp.left, symbolTable);
-        Type rhsExprType = VerifyExpression(expr.binaryOp.right, symbolTable);
-        if (!lhsExprType.isScalar || !rhsExprType.isScalar) {
-            // assert(0 && "Unreachable");
-            CompileErrorAt(token, "Could not apply binary operator {} to non scalar type '{}[]'",
+        Type lhs = VerifyExpression(expr.binaryOp.left, symbolTable);
+        Type rhs = VerifyExpression(expr.binaryOp.right, symbolTable);
+        bool lhsIsScalar = lhs.numPointerLevels == 0;
+        bool rhsIsScalar = rhs.numPointerLevels == 0;
+        bool lhsIsIntegral = IsIntegralType(lhs);
+        bool rhsIsIntegral = IsIntegralType(rhs);
+        bool ok = false;
+        Type resultType;
+
+        // Allowed binary operations:
+        //   - Pointer arithmetic (ptr+int) (add/sub only)
+        //   - Same primitive type
+        //   - Any (pointer) comparison (T==T) (logical only)
+        if (!lhsIsScalar && rhsIsScalar && rhsIsIntegral &&
+            (expr.kind == ASTKind::ADD_BINARYOP_EXPR || expr.kind == ASTKind::SUB_BINARYOP_EXPR))
+        {
+            resultType = lhs;
+        }
+
+        if (lhsIsScalar && rhsIsScalar &&
+            lhs.typeName == rhs.typeName &&
+            IsPrimitiveType(lhs))
+        {
+            resultType = lhs;
+        }
+
+        if (isLogical && lhs == rhs) {
+            resultType = { .typeName="u8", .numPointerLevels=0 };
+        }
+
+        if (resultType.typeName.empty()) {
+            CompileErrorAt(token, "Invalid operands to binary operator ('{}{:@>{}}' {} '{}{:@>{}}')",
+                lhs.typeName, "", lhs.numPointerLevels,
                 token.text,
-                TypeKindName(lhsExprType.isScalar ? rhsExprType.kind : lhsExprType.kind));
-        }
-        if (lhsExprType.kind != rhsExprType.kind) {
-            CompileErrorAt(token, "Invalid operands to binary operator ('{}' {} '{}')",
-                TypeKindName(lhsExprType.kind), token.text, TypeKindName(rhsExprType.kind));
+                rhs.typeName, "", rhs.numPointerLevels);
         }
 
-        if (isLogical) {
-            if (!(lhsExprType.kind == TypeKind::U8 || lhsExprType.kind == TypeKind::I64 || lhsExprType.kind == TypeKind::F64)) {
-                CompileErrorAt(token, "Invalid operands to binary operator ('{}' {} '{}')",
-                    TypeKindName(lhsExprType.kind), token.text, TypeKindName(rhsExprType.kind));
-            }
-
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=lhsExprType.kind,.op_kind=expr.kind}});
-            return { TypeKind::U8, true };
-        }
-        else {
-            // TODO: Disallow invalid binary operations (ex. str + int)
-
-            AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.kind=lhsExprType.kind,.op_kind=expr.kind}});
-            return lhsExprType;
-        }
+        AddInstruction(Instruction{.opcode=Instruction::Opcode::BINARY_OP, .op={.op_kind=expr.kind, .accessKind=TypeAccessKind(resultType)}});
+        return resultType;
     }
 
     assert(0 && "Unreachable");
-    return { TypeKind::NONE, 0 };
+    return {};
 }
 
 void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_view, ASTIndex>& symbolTable) {
@@ -329,12 +501,19 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
         case ASTKind::IF_STATEMENT: {
             ++blockDepth;
             stackAddrs.push_back(stackAddrs.back());
+            blockStackSize.push_back(blockStackSize.back());
             std::unordered_map<std::string_view, ASTIndex> innerScope = symbolTable;
             Type condType = VerifyExpression(stmt.ifstmt.cond, innerScope);
-            
+            if (!IsPrimitiveType(condType) && condType.numPointerLevels == 0) {
+                CompileErrorAt(tokens[stmt.tokenIdx],
+                    "Cannot evaluate non-primitive or non-scalar expression in if statement condition");
+            }
+
             size_t ifJmpIdx = instructions.size();
             AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP_Z});
-            instructions[ifJmpIdx].jmp.accessSize = condType.kind == TypeKind::U8 ? 1 : 8;
+            size_t accessSize = TypeSize(condType);
+            assert(accessSize <= 8);
+            instructions[ifJmpIdx].jmp.accessSize = accessSize;
             VerifyStatements(stmt.ifstmt.body, innerScope);
 
             // If there is an else block, jump one more to skip the fi jump
@@ -350,12 +529,14 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
 
             --blockDepth;
             stackAddrs.pop_back();
+            blockStackSize.pop_back();
         } break;
 
         case ASTKind::FOR_STATEMENT: {
             ++blockDepth;
             ++loopDepth;
             stackAddrs.push_back(stackAddrs.back());
+            blockStackSize.push_back(blockStackSize.back());
             breakAddrs.emplace_back();
             continueAddrs.emplace_back();
 
@@ -369,12 +550,18 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
             Type condType;
             if (hasCondition) {
                 condType = VerifyExpression(stmt.forstmt.cond, innerScope);
+                if (!IsPrimitiveType(condType) && condType.numPointerLevels == 0) {
+                    CompileErrorAt(tokens[stmt.tokenIdx],
+                        "Cannot evaluate non-primitive or non-scalar expression in for statement condition");
+                }
             }
             size_t whileJmpIdx = instructions.size();
 
             if (hasCondition) {
                 AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP_Z});
-                instructions[whileJmpIdx].jmp.accessSize = condType.kind == TypeKind::U8 ? 1 : 8;
+                size_t accessSize = TypeSize(condType);
+                assert(accessSize <= 8);
+                instructions[whileJmpIdx].jmp.accessSize = accessSize;
             }
 
             VerifyStatements(stmt.forstmt.body, innerScope);
@@ -399,6 +586,7 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
             --blockDepth;
             --loopDepth;
             stackAddrs.pop_back();
+            blockStackSize.pop_back();
             breakAddrs.pop_back();
             continueAddrs.pop_back();
         } break;
@@ -410,16 +598,15 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
         case ASTKind::RETURN_STATEMENT: {
             // TODO: Stop generating instructions for current block after returning
             bool hasReturnValue = stmt.ret.expr != AST_NULL;
-            Type retType = hasReturnValue ?
-                VerifyExpression(stmt.ret.expr, symbolTable) :
-                Type{ TypeKind::NONE, true };
-            if (!(retType.isScalar == currProc->returnType.isScalar && retType.kind == currProc->returnType.kind)) {
-                CompileErrorAt(tokens[ast.tree[stmtIdx].tokenIdx],
-                    "Incompatible return type {}{}, expected {}{}",
-                    TypeKindName(retType.kind),
-                    retType.isScalar ? "" : "[]",
-                    TypeKindName(currProc->returnType.kind),
-                    currProc->returnType.isScalar ? "" : "[]");
+            if (hasReturnValue != currProc->hasReturnType) {
+                if (currProc->hasReturnType)
+                    CompileErrorAt(tokens[stmt.tokenIdx], "Procedure returns a value");
+                else
+                    CompileErrorAt(tokens[stmt.tokenIdx], "Procedure does not return a value");
+            }
+            if (hasReturnValue) {
+                Type retType = VerifyExpression(stmt.ret.expr, symbolTable);
+                AssertTypesAreSame(currProc->returnType, retType, tokens[stmt.tokenIdx]);
             }
             if (blockDepth == 0) {
                 returnAtTopLevel = true;
@@ -459,29 +646,15 @@ void Analyzer::VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_
                 CompileErrorAt(tokens[stmt.tokenIdx], "Assignment of read-only variable {}", lhsTok.text);
             }
 
-            bool isScalar = defn.arraySize == AST_NULL;
-            bool hasSubscript = ast.tree[stmt.asgn.lvalue].lvalue.subscript != AST_NULL;
-            Type rhsType = VerifyExpression(stmt.asgn.rvalue, symbolTable);
-            // assert(rhsType.isScalar);
-            bool isRvalueScalar = isScalar || hasSubscript;
-            if (isRvalueScalar != rhsType.isScalar || defn.type != rhsType.kind) {
-                CompileErrorAt(tokens[stmt.tokenIdx], "Incompatible types when assigning '{}' to type {}{} (expected {}{})",
-                               lhsTok.text,
-                               TypeKindName(rhsType.kind),
-                               rhsType.isScalar ? "" : "[]",
-                               TypeKindName(defn.type),
-                               isRvalueScalar ? "" : "[]");
-            }
-            if (isScalar && hasSubscript) {
-                CompileErrorAt(tokens[stmt.tokenIdx], "Cannot subscript scalar variable '{}'", lhsTok.text);
-            }
-
+            Type lhs = VerifyType(defn.type);
+            Type rhs = VerifyExpression(stmt.asgn.rvalue, symbolTable);
+            AssertTypesAreSame(lhs, rhs, tokens[stmt.tokenIdx]);
             VerifyLValue(asgn.lvalue, symbolTable, false);
         } break;
 
         case ASTKind::ASM_STATEMENT: {
-            for (ASTIndex stmtIdx : ast.lists[stmt.asm_.strings]) {
-                AddInstruction(Instruction{.opcode=Instruction::Opcode::INLINE, .str=ast.tree[stmtIdx].literal.str});
+            for (ASTIndex i : ast.lists[stmt.asm_.strings]) {
+                AddInstruction(Instruction{.opcode=Instruction::Opcode::INLINE, .str=ast.tree[i].literal.str});
             }
         } break;
 
@@ -516,45 +689,34 @@ void Analyzer::VerifyProcedure(ASTIndex procIdx) {
     currProc = &procDefn;
     procDefn.instructionNum = instructions.size();
 
-    // if (!hasEntry && token.text == "entry") {
-    //     hasEntry = true;
-    //     entryAddr = instructions.size();
-    //     // TODO: Check arguments and return type of main
-    // }
-
     returnAtTopLevel = false;
-    maxNumVariables = 0;
+    maxStaticStackSize = 0;
     stackAddrs.emplace_back();
+    blockStackSize.push_back(0);
 
     size_t enterIdx = instructions.size();
     AddInstruction(Instruction{.opcode=Instruction::Opcode::ENTER});
 
     // Don't allocate arrays passed as arguments
-    keepGenerating = false;
     VerifyStatements(params, symbolTable);
-    keepGenerating = true;
 
     if (!proc.procedure.isExtern) {
         VerifyStatements(procedure.body, symbolTable);
         if (!returnAtTopLevel) {
-            if (procedure.retType != TypeKind::NONE) {
+            if (procDefn.hasReturnType) {
                 CompileErrorAt(token, "Non-void procedure '{}' did not return in all control paths", token.text);
             }
-            bool hasReturnValue = procDefn.returnType.kind != TypeKind::NONE;
-            AddInstruction(Instruction{.opcode=hasReturnValue ?
+            AddInstruction(Instruction{.opcode=procDefn.hasReturnType ?
                 Instruction::Opcode::RETURN_VAL :
                 Instruction::Opcode::RETURN_VOID});
         }
-        procDefn.stackSpace = maxNumVariables - procDefn.paramTypes.size();
-        instructions[enterIdx].frame.numLocals = procDefn.stackSpace;
+        instructions[enterIdx].frame.localStackSize = maxStaticStackSize - 8*procDefn.paramTypes.size();
         instructions[enterIdx].frame.numParams = procDefn.paramTypes.size();
     }
 
     stackAddrs.pop_back();
+    blockStackSize.pop_back();
 }
-
-#endif
-
 
 class GraphUtil {
     const std::vector<std::vector<uint32_t>>& adj;
@@ -610,11 +772,6 @@ public:
     }
 };
 
-static int64_t RoudUpToPowerOfTwo(int64_t x, int64_t pow) {
-    assert(pow && ((pow & (pow - 1)) == 0));
-    return (x + pow - 1) & -pow;
-}
-
 void Analyzer::VerifyProgram() {
 
     const ASTNode& prog = ast.tree[0];
@@ -625,8 +782,7 @@ void Analyzer::VerifyProgram() {
     structIds["u8"]  = structList.size()+0; resolvedTypes["u8"]  = { .size=1, .alignment=1, .storageKind=TypeDefn::StorageKind::U8 };
     structIds["i64"] = structList.size()+1; resolvedTypes["i64"] = { .size=8, .alignment=8, .storageKind=TypeDefn::StorageKind::I64 };
     // structIds["f32"] = structList.size()+2; resolvedTypes["f32"] = { .size=4, .alignment=4, .storageKind=TypeDefn::StorageKind::F32 };
-    structIds["f64"] = structList.size()+3; resolvedTypes["f64"] = { .size=8, .alignment=8, .storageKind=TypeDefn::StorageKind::F64 };
-    uint32_t numBuiltinTypes = structIds.size();
+    structIds["f64"] = structList.size()+2; resolvedTypes["f64"] = { .size=8, .alignment=8, .storageKind=TypeDefn::StorageKind::F64 };
 
     for (size_t i = 0; i < structList.size(); ++i) {
         ASTIndex structIdx = structList[i];
@@ -691,7 +847,7 @@ void Analyzer::VerifyProgram() {
         ASTIndex structIdx = structList[i];
         const ASTNode& st = ast.tree[structIdx];
         const Token& structName = tokens[st.tokenIdx];
-        fmt::print(stderr, "{}\n", structName.text);
+        // fmt::print(stderr, "{}\n", structName.text);
 
         ASTList members = st.struct_.members;
 
@@ -741,13 +897,8 @@ void Analyzer::VerifyProgram() {
         // fmt::print(stderr, "align={}\n", type.alignment);
     }
 
-    return;
-
-    // Builtins
-    // procedureDefns["as"]
-    // procedureDefns["alloca"]
-    // procedureDefns["numof"]
-    // procedureDefns["sqrt"]
+    // Builtins (but not really, just regular predefined procedures)
+    procedureDefns["sqrt"] = ProcedureDefn{ .paramTypes = { Type{"f64", 0} }, .returnType = Type{"f64", 0}, .hasReturnType = true, .instructionNum = BUILTIN_sqrt };
     // procedureDefns["puti"]
     // procedureDefns["putf"]
     // procedureDefns["puts"]
@@ -765,14 +916,36 @@ void Analyzer::VerifyProgram() {
         }
 
         const std::vector<ASTIndex>& params = ast.lists[proc.procedure.params];
-        procedureDefns[procName.text] = ProcedureDefn{
-                // .paramTypes = params,
-                // .returnType = { proc.procedure.retType, !proc.procedure.retIsArray },
+        std::vector<Type> paramTypes;
+        paramTypes.reserve(params.size());
+        for (ASTIndex paramIdx : params)
+            paramTypes.push_back(VerifyType(ast.tree[paramIdx].defn.type));
+        bool hasReturnType = proc.procedure.retType_ != AST_NULL;
+        procedureDefns[procName.text] = hasReturnType ?
+            ProcedureDefn{ .paramTypes = std::move(paramTypes), .returnType = VerifyType(proc.procedure.retType_), .hasReturnType = true } :
+            ProcedureDefn{ .paramTypes = std::move(paramTypes), .hasReturnType = false };
+    }
+
+    // Constructors - procedures with the same name as the struct, and same parameters as members
+    for (ASTIndex structIdx : structList) {
+        const ASTNode& st = ast.tree[structIdx];
+        const Token& structName = tokens[st.tokenIdx];
+        if (procedureDefns.contains(structName.text)) {
+            CompileErrorAt(structName, "Definition of struct with same name as procedure '{}'", structName.text);
+        }
+
+        const std::vector<ASTIndex>& members = ast.lists[st.struct_.members];
+        std::vector<Type> paramTypes;
+        paramTypes.reserve(members.size());
+        for (ASTIndex paramIdx : members)
+            paramTypes.push_back(VerifyType(ast.tree[paramIdx].defn.type));
+        procedureDefns[structName.text] = ProcedureDefn{
+                .paramTypes = std::move(paramTypes),
+                .returnType = Type{.typeName=structName.text, .numPointerLevels=0},
+                .hasReturnType = true
             };
     }
 
-    // size_t entryJmpIdx = instructions.size();
-    // AddInstruction(Instruction{.opcode=Instruction::Opcode::JMP});
     for (ASTIndex procIdx : procList) {
         const ASTNode& proc = ast.tree[procIdx];
         const Token& procName = tokens[proc.tokenIdx];
@@ -796,7 +969,6 @@ void Analyzer::VerifyProgram() {
     }
 
     for (auto [jumpIdx, procName] : unresolvedCalls) {
-        // fmt::print("resolving call to '{}': {}\n", procName, procedureDefns.at(procName).instructionNum);
         instructions.at(jumpIdx).jmpAddr = procedureDefns.at(procName).instructionNum;
     }
 
@@ -804,10 +976,6 @@ void Analyzer::VerifyProgram() {
         for (size_t i = proc.insStartIdx; i < proc.insEndIdx; ++i)
             proc.instructions.push_back(instructions[i]);
     }
-    // if (!hasEntry) {
-    //     CompileErrorAt(tokens.back(), "Missing entrypoint procedure 'entry'");
-    // }
-    // instructions[entryJmpIdx].jmpAddr = entryAddr;
 }
 
 std::vector<Procedure> VerifyAST(const std::vector<Token>& tokens, AST& ast) {

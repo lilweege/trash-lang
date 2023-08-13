@@ -15,7 +15,7 @@ static bool ParseLiteral(std::string_view text, auto& out) {
 }
 
 const char* ASTKindName(ASTKind kind) {
-    static_assert(static_cast<uint32_t>(ASTKind::COUNT) == 34, "Exhaustive check of AST kinds failed");
+    static_assert(static_cast<uint32_t>(ASTKind::COUNT) == 35, "Exhaustive check of AST kinds failed");
     const std::array<const char*, static_cast<uint32_t>(ASTKind::COUNT)> ASTKindNames{
         "UNINITIALIZED",
         "PROGRAM",
@@ -32,6 +32,7 @@ const char* ASTKindName(ASTKind kind) {
         "ASSIGN",
         "NEG_UNARYOP_EXPR",
         "NOT_UNARYOP_EXPR",
+        "TRUNC_UNARYOP",
         "EQ_BINARYOP_EXPR",
         "NE_BINARYOP_EXPR",
         "GE_BINARYOP_EXPR",
@@ -136,7 +137,8 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             fmt::print(stderr, "\n");
             PrintASTList(root.procedure.params, depth + 1);
             PrintIndent(depth + 1);
-            PrintAST(root.procedure.retType_);
+            if (root.procedure.retType_ != AST_NULL)
+                PrintAST(root.procedure.retType_);
             fmt::print(stderr, "\n");
             PrintASTList(root.procedure.body, depth + 1);
         } break;
@@ -288,6 +290,7 @@ void Parser::PrintAST(ASTIndex rootIdx = AST_NULL, uint32_t depth = 0) const {
             PrintASTList(root.struct_.members, depth + 1);
         } break;
 
+        case ASTKind::TRUNC_UNARYOP:
         case ASTKind::UNINITIALIZED:
         case ASTKind::COUNT: assert(0); break;
     }

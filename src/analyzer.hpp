@@ -8,6 +8,8 @@
 struct Type {
     std::string_view typeName; //TypeKind kind;
     uint32_t numPointerLevels; // bool isScalar;
+
+    auto operator<=>(const Type&) const = default;
 };
 
 struct Procedure {
@@ -23,7 +25,7 @@ class Analyzer {
         enum class StorageKind {
             U8,  // Pass by value (general register)
             I64, // Pass by value (general register)
-            F32, // Pass by value (wide register)
+            // F32, // Pass by value (wide register)
             F64, // Pass by value (wide register)
             STRUCT, // Pass by pointer (general register)
         };
@@ -37,7 +39,7 @@ class Analyzer {
     struct ProcedureDefn {
         std::vector<Type> paramTypes;
         Type returnType;
-        size_t stackSpace;
+        bool hasReturnType;
         size_t instructionNum;
     };
 
@@ -55,10 +57,14 @@ class Analyzer {
     std::vector<std::vector<size_t>> breakAddrs;
     std::vector<std::vector<size_t>> continueAddrs;
     std::vector<std::unordered_map<std::string_view, size_t>> stackAddrs;
+    std::vector<size_t> blockStackSize;
     bool keepGenerating = true;
     std::vector<Instruction> instructions;
 
     void AssertIdentUnusedInCurrentScope(const std::unordered_map<std::string_view, ASTIndex>& symbolTable, const Token& ident);
+    Type VerifyType(ASTIndex typeIdx);
+    uint32_t TypeSize(Type type);
+    uint32_t TypeAlign(Type type);
     void VerifyProcedure(ASTIndex procIdx);
     void VerifyStatements(ASTList list, std::unordered_map<std::string_view, ASTIndex>& symbolTable);
     void VerifyStatement(ASTIndex stmtIdx, std::unordered_map<std::string_view, ASTIndex>& symbolTable);

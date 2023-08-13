@@ -19,10 +19,9 @@ enum class LiteralKind {
     COUNT,
 };
 
-enum class OperandKind {
-    U8,
-    I64, // Includes pointers
-    F64,
+enum class AccessKind {
+    INTEGRAL, // Includes pointers
+    FLOATING,
 };
 
 struct Instruction {
@@ -31,10 +30,10 @@ struct Instruction {
         INLINE,      // Inline asm
         PUSH,        // TOP = x
         LOAD_FAST,   // TOP = *x
-        STORE,       // *TOP = TOP1
         STORE_FAST,  // *x = TOP
-        // ALLOCA,      // *x = alloca(TOP)
-        DEREF,       // TOP = *TOP
+        LOAD,        // TOP = *(TOP + [TOP*x] + y)
+        STORE,       // *(TOP + [TOP*x] + y) = TOP1
+        ALLOCA,      // TOP = alloca(TOP*x)
         UNARY_OP,    // TOP = u(x, TOP)
         BINARY_OP,   // TOP = b(x, TOP1, TOP)
         CALL,        // call extern func
@@ -58,9 +57,8 @@ struct Instruction {
     };
 
     struct Operator {
-        // TypeKind kind;
-        OperandKind kind_;
         ASTKind op_kind;
+        AccessKind accessKind;
     };
 
     struct ConditionalJump {
@@ -70,10 +68,16 @@ struct Instruction {
 
     struct StackFrame {
         size_t numParams;
-        size_t numLocals;
+        size_t localStackSize;
     };
 
     struct Access {
+        size_t accessSize;
+        size_t offset;
+        bool hasSubscript;
+    };
+
+    struct FastAccess {
         size_t varAddr;
         size_t accessSize;
     };
@@ -81,10 +85,12 @@ struct Instruction {
     union {
         ASTNode::StringView str; // call, inline
         Literal lit; // push
-        Access access; // load_fast, store_fast, alloca
+        Access access; // load, store
+        FastAccess fastAccess; // load_fast, store_fast
         Operator op; // unaryop, binaryop
         ConditionalJump jmp; // jz
         uint64_t jmpAddr; // jmp, save
+        uint64_t multiplier; // alloca
         StackFrame frame; // enter, return
     };
 };
